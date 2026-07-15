@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { to: '/plugins', label: 'Plugins', icon: '🧩' },
   { to: '/calibration', label: 'Calibration', icon: '🎯' },
   { to: '/settings', label: 'Settings', icon: '⚒' },
+  { to: '/virtual-camera', label: 'Virtual Camera', icon: '🎥' },
 ];
 
 export function Sidebar(): JSX.Element {
