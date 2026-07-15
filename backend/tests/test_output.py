@@ -106,12 +106,14 @@ class TestVirtualCameraOutput:
         plugin = VirtualCameraOutput()
         assert plugin.get_state() is None
 
-    def test_reset_clears_state(self):
+    def test_reset_returns_to_center(self):
         plugin = VirtualCameraOutput()
         state = _make_state()
         plugin.apply(state)
         plugin.reset()
-        assert plugin.get_state() is None
+        result = plugin.get_state()
+        assert result.center_x == 0.5
+        assert result.center_y == 0.5
 
     def test_is_available(self):
         plugin = VirtualCameraOutput()
@@ -241,8 +243,9 @@ class TestOutputManager:
         manager.apply(state)
         manager.reset()
         assert manager.get_last_state() == state
-        for plugin in manager._plugins.values():
-            assert plugin.get_state() is None
+        vc = manager._plugins[OutputMode.VIRTUAL]
+        assert vc.get_state().center_x == 0.5
+        assert vc.get_state().center_y == 0.5
 
     def test_singleton_pattern(self):
         manager1 = OutputManager.get_instance()
