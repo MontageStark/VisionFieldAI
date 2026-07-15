@@ -16,8 +16,9 @@ if errorlevel 1 (
     pip install -r backend/requirements.txt
 )
 
-echo Starting backend on http://0.0.0.0:8000
+set PORT=8001
+echo Starting backend on http://0.0.0.0:%PORT%
 echo Press Ctrl+C to stop
 echo.
 
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port %PORT% --reload
