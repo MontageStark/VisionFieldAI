@@ -12,6 +12,7 @@ import Plugins from '@/pages/Plugins/Plugins';
 import Calibration from '@/pages/Calibration/Calibration';
 import Settings from '@/pages/Settings/Settings';
 import VirtualCamera from '@/pages/VirtualCamera';
+import Hardware from '@/pages/Hardware';
 
 export default function App(): JSX.Element {
   return (
@@ -29,6 +30,7 @@ export default function App(): JSX.Element {
         <Route path="/calibration" element={<Calibration />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/virtual-camera" element={<VirtualCamera />} />
+        <Route path="/hardware" element={<Hardware />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
