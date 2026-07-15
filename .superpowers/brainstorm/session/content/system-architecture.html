@@ -1,0 +1,126 @@
+<h2>AI Football Auto Camera — System Architecture</h2>
+<p class="subtitle">Three-node architecture: Phone (Camera) → Laptop (AI) → ESP32 (Servo)</p>
+
+<div class="mockup">
+  <div class="mockup-header">System Architecture Diagram</div>
+  <div class="mockup-body" style="padding: 1.5rem; font-family: monospace; font-size: 0.85rem; line-height: 1.6;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; text-align: center;">
+      
+      <!-- Phone Node -->
+      <div style="background: #1a1a2e; border: 2px solid #0f3460; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 1.5rem;">📱</div>
+        <div style="color: #e94560; font-weight: bold; margin: 0.5rem 0;">Android Phone</div>
+        <div style="color: #aaa; font-size: 0.75rem;">
+          Larix Broadcaster<br>
+          RTSP Stream<br>
+          1080p @ 30fps<br>
+          WiFi (5GHz)
+        </div>
+      </div>
+
+      <!-- Laptop Node -->
+      <div style="background: #1a1a2e; border: 2px solid #0f3460; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 1.5rem;">💻</div>
+        <div style="color: #e94560; font-weight: bold; margin: 0.5rem 0;">Windows Laptop</div>
+        <div style="color: #aaa; font-size: 0.75rem;">
+          GTX 1650 CUDA<br>
+          YOLO11 + ByteTrack<br>
+          FastAPI Backend<br>
+          React Dashboard
+        </div>
+      </div>
+
+      <!-- ESP32 Node -->
+      <div style="background: #1a1a2e; border: 2px solid #0f3460; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 1.5rem;">🔌</div>
+        <div style="color: #e94560; font-weight: bold; margin: 0.5rem 0;">ESP32 DevKit</div>
+        <div style="color: #aaa; font-size: 0.75rem;">
+          WebSocket Client<br>
+          DS3235 Servo Driver<br>
+          PID Smoothing<br>
+          Watchdog Timer
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Flow Arrows -->
+    <div style="margin-top: 1.5rem; text-align: center;">
+      <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+        <span style="color: #0f3460;">━━━━━━━</span>
+        <span style="color: #e94560; font-size: 0.7rem;">RTSP (WiFi)</span>
+        <span style="color: #0f3460;">━━━━━━━▶</span>
+        <span style="color: #e94560; font-size: 0.7rem;">WebSocket</span>
+        <span style="color: #0f3460;">━━━━━━━▶</span>
+        <span style="color: #e94560; font-size: 0.7rem;">PWM Signal</span>
+        <span style="color: #0f3460;">━━━━━━━</span>
+      </div>
+    </div>
+
+    <!-- Software Stack -->
+    <div style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div style="background: #16213e; border-radius: 6px; padding: 0.75rem; text-align: left;">
+        <div style="color: #e94560; font-weight: bold; font-size: 0.75rem;">Backend Stack</div>
+        <div style="color: #aaa; font-size: 0.65rem; margin-top: 0.25rem;">
+          Python 3.12 · FastAPI · OpenCV<br>
+          YOLO11 · ByteTrack · PyTorch CUDA<br>
+          WebSockets · Pydantic · SQLite
+        </div>
+      </div>
+      <div style="background: #16213e; border-radius: 6px; padding: 0.75rem; text-align: left;">
+        <div style="color: #e94560; font-weight: bold; font-size: 0.75rem;">Frontend Stack</div>
+        <div style="color: #aaa; font-size: 0.65rem; margin-top: 0.25rem;">
+          React 18 · Vite · TypeScript<br>
+          TailwindCSS · Recharts<br>
+          WebSocket Client
+        </div>
+      </div>
+    </div>
+
+    <!-- External Integrations -->
+    <div style="margin-top: 1rem; text-align: center;">
+      <div style="display: inline-flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+        <span style="background: #0f3460; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.7rem; color: #aaa;">OBS Studio</span>
+        <span style="background: #0f3460; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.7rem; color: #aaa;">YouTube Live</span>
+        <span style="background: #0f3460; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.7rem; color: #aaa;">SQLite Logs</span>
+        <span style="background: #0f3460; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.7rem; color: #aaa;">YAML Config</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top: 1.5rem;">Key Design Decisions</h3>
+<div class="options" data-multiselect>
+  <div class="option" data-choice="monorepo" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Monorepo Structure</h3>
+      <p>backend/ · frontend/ · firmware/ · configs/ · tests/ — single repo, clear boundaries</p>
+    </div>
+  </div>
+  <div class="option" data-choice="yaml-config" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>YAML Configuration</h3>
+      <p>All settings in configs/*.yaml — zero hardcoded values, hot-reloadable</p>
+    </div>
+  </div>
+  <div class="option" data-choice="websocket" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>WebSocket Communication</h3>
+      <p>Laptop ↔ ESP32 via JSON over WebSocket — low latency, bidirectional</p>
+    </div>
+  </div>
+  <div class="option" data-choice="phase-dev" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Phased Development</h3>
+      <p>7 phases, each building on the last — scaffold → capture → AI → action → servo → dashboard → optimize</p>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top: 1rem; color: #666; font-size: 0.85rem;">
+  Take a look at the architecture. Click to select any design decisions you agree with, 
+  or let me know if you'd like to adjust anything.
+</p>

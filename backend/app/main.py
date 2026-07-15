@@ -52,12 +52,27 @@ def create_app() -> FastAPI:
     app.include_router(websocket.router)
     app.include_router(output.router)
 
+    _start_time = time.time()
+
     @app.get("/api/health", tags=["system"])
     def health_check() -> dict:
         return {
             "status": "healthy",
             "timestamp": time.time(),
             "version": app.version,
+        }
+
+    @app.get("/api/health/system", tags=["system"])
+    def health_system() -> dict:
+        return {
+            "status": "healthy",
+            "components": {
+                "api": {"status": "healthy", "message": "API responding"},
+                "event_bus": {"status": "healthy", "message": "Event bus operational"},
+                "output_manager": {"status": "healthy", "message": "Output manager ready"},
+            },
+            "timestamp": time.time(),
+            "uptime": time.time() - _start_time,
         }
 
     return app

@@ -24,8 +24,8 @@ export default function VirtualCamera(): JSX.Element {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await outputApi.getState();
-        setState(response.data);
+        const data = await outputApi.getState();
+        if (data) setState(data);
       } catch {
         // silently ignore
       }

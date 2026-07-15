@@ -65,11 +65,12 @@ export function Header(): JSX.Element {
         setError(err?.message ?? 'API unreachable');
       });
 
-    wsClient.onStatus((s) => setWsStatus(s));
+    const unsubscribeStatus = wsClient.onStatus((s) => setWsStatus(s));
     wsClient.connect();
 
     return () => {
       cancelled = true;
+      unsubscribeStatus();
     };
   }, [setApiConnected, setError, setSystemState, setWsStatus]);
 

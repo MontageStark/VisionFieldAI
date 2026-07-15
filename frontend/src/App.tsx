@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AppLayout from '@/components/layout/AppLayout';
 import Dashboard from '@/pages/Dashboard/Dashboard';
 import Camera from '@/pages/Camera/Camera';
@@ -16,23 +17,25 @@ import Hardware from '@/pages/Hardware';
 
 export default function App(): JSX.Element {
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/camera" element={<Camera />} />
-        <Route path="/servo" element={<Servo />} />
-        <Route path="/director" element={<Director />} />
-        <Route path="/streaming" element={<Streaming />} />
-        <Route path="/replay" element={<Replay />} />
-        <Route path="/health" element={<Health />} />
-        <Route path="/logs" element={<Logs />} />
-        <Route path="/plugins" element={<Plugins />} />
-        <Route path="/calibration" element={<Calibration />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/virtual-camera" element={<VirtualCamera />} />
-        <Route path="/hardware" element={<Hardware />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/camera" element={<Camera />} />
+          <Route path="/servo" element={<Servo />} />
+          <Route path="/director" element={<Director />} />
+          <Route path="/streaming" element={<Streaming />} />
+          <Route path="/replay" element={<Replay />} />
+          <Route path="/health" element={<Health />} />
+          <Route path="/logs" element={<Logs />} />
+          <Route path="/plugins" element={<Plugins />} />
+          <Route path="/calibration" element={<Calibration />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/virtual-camera" element={<VirtualCamera />} />
+          <Route path="/hardware" element={<Hardware />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </ErrorBoundary>
   );
 }

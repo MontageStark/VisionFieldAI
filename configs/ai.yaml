@@ -1,0 +1,5 @@
+ai:
+  model_name: "yolo11n.pt"
+  confidence_threshold: 0.5
+  device: "cuda"
+  max_detections: 100

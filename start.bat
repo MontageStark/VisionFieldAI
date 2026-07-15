@@ -8,11 +8,11 @@ echo Close this window or press Ctrl+C to stop both.
 echo.
 
 cd /d "%~dp0"
-set PYTHONPATH=%cd%
+set PYTHONPATH=%cd%;%cd%\backend
 
 REM Start backend in background
 echo [1/2] Starting backend on http://localhost:8001 ...
-start "FieldVision Backend" cmd /c "cd /d %~dp0 && set PYTHONPATH=%cd% && python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 --reload"
+start "FieldVision Backend" cmd /c "cd /d %~dp0 && set PYTHONPATH=%cd%;%cd%\backend && python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 --reload"
 
 REM Wait for backend to be ready
 echo [2/2] Waiting for backend...

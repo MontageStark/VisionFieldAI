@@ -1,0 +1,16 @@
+# Build directory
+build/
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# PlatformIO
+.platformio/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

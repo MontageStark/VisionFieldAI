@@ -6,8 +6,8 @@ echo.
 
 cd /d "%~dp0"
 
-REM Set PYTHONPATH so imports work
-set PYTHONPATH=%cd%
+REM Set PYTHONPATH so imports work (both root and backend dir needed)
+set PYTHONPATH=%cd%;%cd%\backend
 
 REM Check if uvicorn is installed
 python -c "import uvicorn" 2>nul
