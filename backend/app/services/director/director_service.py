@@ -52,12 +52,14 @@ class DirectorService:
         self,
         config: Optional[DirectorConfig] = None,
         mode: Optional[DirectorMode] = None,
+        output_manager: Optional[Any] = None,
     ) -> None:
         """Initialize the director service.
 
         Args:
             config: Explicit DirectorConfig (takes precedence)
             mode: Director mode (used if config is None)
+            output_manager: Optional OutputManager for forwarding camera states
         """
         if config is not None:
             self._config = config
@@ -66,6 +68,7 @@ class DirectorService:
 
         self._composer = ShotComposer(mode=self._config.mode)
         self._event_bus = self._config.event_bus
+        self._output_manager = output_manager
         self._running = False
         self._lock = threading.Lock()
 
@@ -82,6 +85,8 @@ class DirectorService:
 
         if self._event_bus is not None:
             self._subscribe_to_events()
+            if self._output_manager is not None:
+                self._subscribe_to_output_events()
 
     def _subscribe_to_events(self) -> None:
         """Subscribe to tracking events."""
@@ -95,6 +100,41 @@ class DirectorService:
             logger.info("Subscribed to %s", EventType.TRACKING_UPDATED.value)
         except Exception as exc:
             logger.error("Failed to subscribe to events: %s", exc)
+
+    def _subscribe_to_output_events(self) -> None:
+        """Subscribe to CAMERA_STATE_UPDATED to forward to OutputManager."""
+        if self._event_bus is None or self._output_manager is None:
+            return
+        try:
+            self._event_bus.subscribe(
+                EventType.CAMERA_STATE_UPDATED,
+                self._on_camera_state_for_output,
+            )
+            logger.info(
+                "Subscribed to %s for output forwarding",
+                EventType.CAMERA_STATE_UPDATED.value,
+            )
+        except Exception as exc:
+            logger.error("Failed to subscribe to output events: %s", exc)
+
+    def _on_camera_state_for_output(self, event: Any) -> None:
+        """Forward CAMERA_STATE_UPDATED to OutputManager."""
+        if self._output_manager is None:
+            return
+        try:
+            data = event.data if hasattr(event, "data") else {}
+            state = CameraState(
+                center_x=data.get("center_x", 0.5),
+                center_y=data.get("center_y", 0.5),
+                zoom=data.get("zoom", 1.5),
+                motion_profile=MotionProfile(data.get("motion_profile", "broadcast")),
+                tracking_mode=data.get("tracking_mode", "broadcast"),
+                confidence=data.get("confidence", 0.5),
+                timestamp=data.get("timestamp", 0.0),
+            )
+            self._output_manager.apply(state)
+        except Exception as exc:
+            logger.error("Error forwarding camera state to output: %s", exc)
 
     def _on_tracking_updated(self, event: Any) -> None:
         """Handle tracking updated event from tracking service.
