@@ -106,6 +106,14 @@ export const healthApi = {
       .catch(handleError),
 };
 
+// ─── Output ────────────────────────────────────────────────────────────
+export const outputApi = {
+  getMode: () => client.get('/output/mode').then((r) => r.data).catch(handleError),
+  setMode: (mode: string) => client.post('/output/mode', { mode }).then((r) => r.data).catch(handleError),
+  getState: () => client.get('/output/state').then((r) => r.data).catch(handleError),
+  reset: () => client.post('/output/reset').then((r) => r.data).catch(handleError),
+};
+
 // Re-export for convenience
 export type { CameraAction };
 
