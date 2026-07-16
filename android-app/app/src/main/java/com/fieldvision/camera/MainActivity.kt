@@ -261,13 +261,17 @@ class MainActivity : AppCompatActivity() {
                 override fun onDisconnected(camera: CameraDevice) {
                     camera.close()
                     cameraDevice = null
-                    updateStatus("Camera disconnected", StatusType.ERROR)
+                    runOnUiThread {
+                        updateStatus("Camera disconnected", StatusType.ERROR)
+                    }
                 }
                 
                 override fun onError(camera: CameraDevice, error: Int) {
                     camera.close()
                     cameraDevice = null
-                    updateStatus("Camera error: $error", StatusType.ERROR)
+                    runOnUiThread {
+                        updateStatus("Camera error: $error", StatusType.ERROR)
+                    }
                 }
             }, cameraHandler)
         } catch (e: SecurityException) {
@@ -326,7 +330,9 @@ class MainActivity : AppCompatActivity() {
                     override fun onConfigured(session: CameraCaptureSession) {
                         captureSession = session
                         startPreview()
-                        updateStatus("Camera ready", StatusType.READY)
+                        runOnUiThread {
+                            updateStatus("Camera ready", StatusType.READY)
+                        }
                         
                         discoveryService.start()
                         networkMonitor.startMonitoring()
@@ -342,13 +348,17 @@ class MainActivity : AppCompatActivity() {
                     }
                     
                     override fun onConfigureFailed(session: CameraCaptureSession) {
-                        updateStatus("Session config failed", StatusType.ERROR)
+                        runOnUiThread {
+                            updateStatus("Session config failed", StatusType.ERROR)
+                        }
                     }
                 },
                 cameraHandler
             )
         } catch (e: CameraAccessException) {
-            updateStatus("Session error", StatusType.ERROR)
+            runOnUiThread {
+                updateStatus("Session error", StatusType.ERROR)
+            }
         }
     }
     
