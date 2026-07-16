@@ -7,11 +7,25 @@ from app.models.camera_state import OutputConfig
 class CameraSettings(BaseModel):
     """Camera configuration settings."""
 
+    source_type: str = Field(default="auto", description="Camera source type (device, file, http, auto)")
     device_id: int = Field(default=0, ge=0, description="Camera device ID")
     width: int = Field(default=1920, gt=0, le=7680, description="Capture width in pixels")
     height: int = Field(default=1080, gt=0, le=4320, description="Capture height in pixels")
     fps: int = Field(default=30, ge=1, le=120, description="Frames per second")
     buffer_size: int = Field(default=10, ge=1, le=100, description="Frame buffer size")
+    
+    # HTTP (phone stream) settings
+    http_url: str = Field(default="http://192.168.1.5:8080/video", description="HTTP stream URL")
+    http_protocol: str = Field(default="auto", description="HTTP protocol (webrtc, h264, mjpeg, auto)")
+    
+    # Auto-discovery settings
+    discovery_enabled: bool = Field(default=True, description="Enable UDP discovery")
+    discovery_port: int = Field(default=9999, ge=1, le=65535, description="Discovery UDP port")
+    auto_connect: bool = Field(default=True, description="Auto-connect to discovered phones")
+    
+    # File source settings
+    file_path: str = Field(default="", description="Path to video file")
+    loop: bool = Field(default=True, description="Loop video file")
 
 
 class ServoAxisSettings(BaseModel):

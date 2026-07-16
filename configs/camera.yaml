@@ -1,6 +1,25 @@
 camera:
+  source_type: "auto"           # "device", "file", "http", "auto"
+  
+  # For device (USB camera)
   device_id: 0
-  width: 1920
-  height: 1080
+  
+  # For file (simulation)
+  file_path: ""
+  loop: true
+  
+  # For HTTP (phone stream)
+  http_url: "http://192.168.1.5:8080/video"
+  http_protocol: "auto"         # "webrtc", "h264", "mjpeg", "auto"
+  
+  # Auto-discovery
+  discovery_enabled: true
+  discovery_port: 9999
+  auto_connect: true
+  
+  # Capture settings
+  resolution:
+    width: 3840
+    height: 2160
   fps: 30
-  buffer_size: 10
+  buffer_size: 3
