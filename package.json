@@ -1,0 +1,33 @@
+{
+  "name": "fieldvision-ai",
+  "version": "1.0.0",
+  "description": "AI-powered sports broadcasting platform with auto-framing and virtual camera",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "cd backend && python -m pytest tests/ -v",
+    "test:coverage": "cd backend && python -m pytest tests/ --cov=app --cov-report=html",
+    "lint:python": "cd backend && python -m flake8 app/ --max-line-length=120",
+    "lint:android": "cd android-app && ./gradlew lint",
+    "ecc:doctor": "node node_modules/ecc-universal/scripts/ecc.js doctor",
+    "ecc:repair": "node node_modules/ecc-universal/scripts/ecc.js repair",
+    "ecc:list": "node node_modules/ecc-universal/scripts/ecc.js list-installed"
+  },
+  "keywords": [
+    "ai",
+    "sports",
+    "broadcasting",
+    "camera",
+    "auto-framing",
+    "yolo",
+    "opencv"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "ecc-universal": "^2.0.0"
+  }
+}
