@@ -1,12 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.FieldVisionCamera" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#FF6200EE</item>
-        <item name="colorPrimaryVariant">#FF3700B3</item>
-        <item name="colorOnPrimary">#FFFFFFFF</item>
-        <item name="colorSecondary">#FF03DAC5</item>
-        <item name="colorSecondaryVariant">#FF018786</item>
-        <item name="colorOnSecondary">#FF000000</item>
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <item name="colorSecondary">@color/accent</item>
+        <item name="colorSecondaryVariant">@color/accent_dark</item>
+        <item name="colorOnSecondary">@color/background_dark</item>
+        <item name="android:statusBarColor">@color/background_dark</item>
+        <item name="android:navigationBarColor">@color/background_dark</item>
+        <item name="android:windowBackground">@color/background_dark</item>
+    </style>
+    
+    <!-- Streaming Button Style -->
+    <style name="StreamButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="cornerRadius">28dp</item>
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">14dp</item>
+        <item name="elevation">8dp</item>
+    </style>
+    
+    <!-- Resolution Button Style -->
+    <style name="ResolutionButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
     </style>
 </resources>

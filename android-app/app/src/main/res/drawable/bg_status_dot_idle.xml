@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="oval">
+            <solid android:color="@color/status_streaming" />
+            <size android:width="10dp" android:height="10dp" />
+        </shape>
+    </item>
+    <item android:state_focused="true">
+        <shape android:shape="oval">
+            <solid android:color="@color/status_connecting" />
+            <size android:width="10dp" android:height="10dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/status_idle" />
+            <size android:width="10dp" android:height="10dp" />
+        </shape>
+    </item>
+</selector>
