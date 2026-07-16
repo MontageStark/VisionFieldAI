@@ -40,7 +40,7 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var previewView: TextureView
     private lateinit var statusText: TextView
-    private lateinit var statusDot: ImageView
+    private lateinit var statusDot: View
     private lateinit var liveIndicator: LinearLayout
     private lateinit var liveDot: View
     private lateinit var networkType: TextView
@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
         // Network callback
         networkMonitor.onConnectionChanged = { connection ->
             scope.launch {
-                networkType.text = connection.type
+                networkType.text = connection.type.name
                 networkBandwidth.text = "${connection.bandwidth.toInt()} Mbps available"
                 
                 // Animate bandwidth update
@@ -328,8 +328,11 @@ class MainActivity : AppCompatActivity() {
             StatusType.ERROR -> getColor(R.color.status_error)
         }
         
-        val drawable = statusDot.background as? GradientDrawable
-        drawable?.setColor(dotColor)
+        val drawable = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(dotColor)
+        }
+        statusDot.background = drawable
     }
     
     // Animations
