@@ -301,17 +301,25 @@ class MainActivity : AppCompatActivity() {
         texture.setDefaultBufferSize(1920, 1080)
         val previewSurface = Surface(texture)
         
-        // Lower resolution for streaming (720p) to reduce lag
-        val streamWidth = 1280
-        val streamHeight = 720
+        // Full HD streaming
+        val streamWidth = 1920
+        val streamHeight = 1080
         
-        // Use YUV_420_888 for reliable capture
-        imageReader = ImageReader.newInstance(streamWidth, streamHeight, ImageFormat.YUV_420_888, 2)
+        // Use JPEG capture - camera ISP handles color conversion correctly
+        imageReader = ImageReader.newInstance(streamWidth, streamHeight, ImageFormat.JPEG, 2)
         imageReader?.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
             try {
                 if (isStreaming) {
-                    processYuvFrame(image, streamWidth, streamHeight)
+                    val buffer = image.planes[0].buffer
+                    val bytes = ByteArray(buffer.remaining())
+                    buffer.get(bytes)
+                    
+                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (bitmap != null) {
+                        streamServer.sendFrame(bitmap)
+                        bitmap.recycle()
+                    }
                 }
             } catch (e: Exception) {
                 // Ignore frame errors
@@ -366,11 +374,11 @@ class MainActivity : AppCompatActivity() {
         val camera = cameraDevice ?: return
         val session = captureSession ?: return
         
-        val streamWidth = 1280
-        val streamHeight = 720
+        val streamWidth = 1920
+        val streamHeight = 1080
         
         try {
-            // Preview request - use same size as stream
+            // Preview request at full resolution
             val previewBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
             previewView.surfaceTexture?.let { texture ->
                 texture.setDefaultBufferSize(streamWidth, streamHeight)
@@ -378,27 +386,26 @@ class MainActivity : AppCompatActivity() {
             }
             previewBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
             
-            // Streaming request (captures to ImageReader)
+            // JPEG capture request for streaming
             val streamBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
             imageReader?.surface?.let { streamBuilder.addTarget(it) }
             streamBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-            streamBuilder.set(CaptureRequest.JPEG_QUALITY, 65.toByte())
+            streamBuilder.set(CaptureRequest.JPEG_QUALITY, 70.toByte())
             
             // Set up repeating preview
             session.setRepeatingRequest(previewBuilder.build(), null, cameraHandler)
             
-            // Capture stills at ~5fps for streaming
             val captureCallback = object : CameraCaptureSession.CaptureCallback() {
                 override fun onCaptureCompleted(
                     session: CameraCaptureSession,
                     request: CaptureRequest,
                     result: TotalCaptureResult
                 ) {
-                    // Frame captured - ImageReader callback will handle it
+                    // Frame captured - ImageReader callback handles it
                 }
             }
             
-            // Schedule periodic capture for streaming
+            // Capture at ~15fps for 1080p JPEG streaming (balance of quality and performance)
             scope.launch {
                 while (isActive && captureSession != null) {
                     try {
@@ -406,7 +413,7 @@ class MainActivity : AppCompatActivity() {
                     } catch (e: Exception) {
                         // Ignore capture errors
                     }
-                    delay(333) // ~3fps for streaming
+                    delay(67) // ~15fps
                 }
             }
         } catch (e: CameraAccessException) {
