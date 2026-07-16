@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
+import android.graphics.YuvImage
 import android.hardware.camera2.*
 import android.media.ImageReader
 import android.os.Bundle
@@ -31,6 +32,7 @@ import com.fieldvision.camera.stream.StreamServer
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.*
+import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -299,19 +301,17 @@ class MainActivity : AppCompatActivity() {
         texture.setDefaultBufferSize(1920, 1080)
         val previewSurface = Surface(texture)
         
-        // Create ImageReader for streaming
-        imageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 2)
+        // Lower resolution for streaming (720p) to reduce lag
+        val streamWidth = 1280
+        val streamHeight = 720
+        
+        // Use YUV_420_888 for reliable capture
+        imageReader = ImageReader.newInstance(streamWidth, streamHeight, ImageFormat.YUV_420_888, 2)
         imageReader?.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
             try {
-                val buffer = image.planes[0].buffer
-                val bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                
-                // Convert to bitmap and send
-                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                if (bitmap != null && isStreaming) {
-                    streamServer.sendFrame(bitmap)
+                if (isStreaming) {
+                    processYuvFrame(image, streamWidth, streamHeight)
                 }
             } catch (e: Exception) {
                 // Ignore frame errors
@@ -329,7 +329,7 @@ class MainActivity : AppCompatActivity() {
                 object : CameraCaptureSession.StateCallback() {
                     override fun onConfigured(session: CameraCaptureSession) {
                         captureSession = session
-                        startPreview()
+                        startStreamingCapture()
                         runOnUiThread {
                             updateStatus("Camera ready", StatusType.READY)
                         }
@@ -362,23 +362,119 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startPreview() {
+    private fun startStreamingCapture() {
         val camera = cameraDevice ?: return
         val session = captureSession ?: return
         
+        val streamWidth = 1280
+        val streamHeight = 720
+        
         try {
-            val builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+            // Preview request - use same size as stream
+            val previewBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
             previewView.surfaceTexture?.let { texture ->
-                texture.setDefaultBufferSize(1920, 1080)
-                builder.addTarget(Surface(texture))
+                texture.setDefaultBufferSize(streamWidth, streamHeight)
+                previewBuilder.addTarget(Surface(texture))
             }
-            imageReader?.surface?.let { builder.addTarget(it) }
+            previewBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
             
-            builder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+            // Streaming request (captures to ImageReader)
+            val streamBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+            imageReader?.surface?.let { streamBuilder.addTarget(it) }
+            streamBuilder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+            streamBuilder.set(CaptureRequest.JPEG_QUALITY, 65.toByte())
             
-            session.setRepeatingRequest(builder.build(), null, cameraHandler)
+            // Set up repeating preview
+            session.setRepeatingRequest(previewBuilder.build(), null, cameraHandler)
+            
+            // Capture stills at ~5fps for streaming
+            val captureCallback = object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureCompleted(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    result: TotalCaptureResult
+                ) {
+                    // Frame captured - ImageReader callback will handle it
+                }
+            }
+            
+            // Schedule periodic capture for streaming
+            scope.launch {
+                while (isActive && captureSession != null) {
+                    try {
+                        session.capture(streamBuilder.build(), captureCallback, cameraHandler)
+                    } catch (e: Exception) {
+                        // Ignore capture errors
+                    }
+                    delay(333) // ~3fps for streaming
+                }
+            }
         } catch (e: CameraAccessException) {
             // Ignore
+        }
+    }
+    
+    private fun processYuvFrame(image: android.media.Image, width: Int, height: Int) {
+        try {
+            val yPlane = image.planes[0]
+            val uPlane = image.planes[1]
+            val vPlane = image.planes[2]
+            
+            val yRowStride = yPlane.rowStride
+            val uvRowStride = uPlane.rowStride
+            
+            val ySize = width * height
+            val nv21 = ByteArray(ySize + (ySize / 2))
+            
+            // Copy Y plane row by row (handle stride gaps)
+            val yBuffer = yPlane.buffer
+            var yPos = 0
+            for (i in 0 until height) {
+                val rowStart = i * yRowStride
+                yBuffer.position(rowStart)
+                val rowEnd = rowStart + width
+                while (yBuffer.position() < rowEnd && yBuffer.hasRemaining()) {
+                    nv21[yPos++] = yBuffer.get()
+                }
+            }
+            
+            // Build interleaved VU from U and V planes
+            val yHalf = height / 2
+            val uvWidth = width / 2
+            val uBuffer = uPlane.buffer
+            val vBuffer = vPlane.buffer
+            
+            var uvIndex = ySize
+            for (i in 0 until yHalf) {
+                val uvRowStart = i * uvRowStride
+                for (j in 0 until uvWidth) {
+                    val uPos = uvRowStart + j * 2 // U at even offset
+                    val vPos = uvRowStart + j * 2 + 1 // V at odd offset
+                    
+                    // NV21: V first, then U
+                    if (vPos < vBuffer.capacity()) {
+                        nv21[uvIndex++] = vBuffer.get(vPos)
+                    }
+                    if (uPos < uBuffer.capacity()) {
+                        nv21[uvIndex++] = uBuffer.get(uPos)
+                    }
+                }
+            }
+            
+            // Convert NV21 to JPEG
+            val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
+            val out = ByteArrayOutputStream()
+            yuvImage.compressToJpeg(android.graphics.Rect(0, 0, width, height), 50, out)
+            val imageBytes = out.toByteArray()
+            
+            // Convert to bitmap
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            if (bitmap != null) {
+                streamServer.sendFrame(bitmap)
+                bitmap.recycle()
+            }
+        } catch (e: Exception) {
+            // Ignore conversion errors
         }
     }
     
