@@ -173,6 +173,7 @@
                     app:tint="@color/text_hint" />
 
                 <LinearLayout
+                    android:id="@+id/networkInfo"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -195,6 +196,15 @@
                         android:textColor="@color/text_hint"
                         android:textSize="11sp"
                         android:fontFamily="sans-serif" />
+
+                    <TextView
+                        android:id="@+id/ipAddress"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="IP: --"
+                        android:textColor="@color/accent"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif-medium" />
                 </LinearLayout>
 
                 <!-- Resolution Badge -->

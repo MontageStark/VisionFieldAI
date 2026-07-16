@@ -1,39 +1,47 @@
 package com.fieldvision.camera
 
-import android.Manifest
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
-import android.content.pm.PackageManager
-import android.graphics.SurfaceTexture
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageFormat
 import android.graphics.Matrix
-import android.graphics.drawable.GradientDrawable
+import android.graphics.SurfaceTexture
+import android.hardware.camera2.*
+import android.media.ImageReader
 import android.os.Bundle
+import android.os.Handler
+import android.os.HandlerThread
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.OvershootInterpolator
-import android.widget.Button
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.fieldvision.camera.camera.CameraConfig
-import com.fieldvision.camera.camera.CameraEngine
 import com.fieldvision.camera.camera.Resolution
 import com.fieldvision.camera.discovery.DiscoveryService
 import com.fieldvision.camera.discovery.PhoneInfo
 import com.fieldvision.camera.network.NetworkMonitor
 import com.fieldvision.camera.stream.StreamServer
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.*
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 class MainActivity : AppCompatActivity() {
     
-    private lateinit var cameraEngine: CameraEngine
+    private var cameraDevice: CameraDevice? = null
+    private var captureSession: CameraCaptureSession? = null
+    private var cameraThread: HandlerThread? = null
+    private var cameraHandler: Handler? = null
+    private var imageReader: ImageReader? = null
+    
     private lateinit var streamServer: StreamServer
     private lateinit var discoveryService: DiscoveryService
     private lateinit var networkMonitor: NetworkMonitor
@@ -45,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var liveDot: View
     private lateinit var networkType: TextView
     private lateinit var networkBandwidth: TextView
+    private lateinit var ipAddress: TextView
     private lateinit var resolutionBadge: TextView
     private lateinit var btnStream: MaterialButton
     
@@ -59,28 +68,22 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
-        // Keep screen on
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        
-        // Make status bar transparent
         window.statusBarColor = getColor(R.color.background_dark)
         
-        // Initialize views
         initializeViews()
         
-        // Initialize services
-        cameraEngine = CameraEngine(this)
         streamServer = StreamServer()
         discoveryService = DiscoveryService()
         networkMonitor = NetworkMonitor(this)
         
-        // Setup listeners
         setupListeners()
-        
-        // Animate UI on start
         animateUIOnStart()
+        displayIpAddress()
         
-        // Check permissions
+        cameraThread = HandlerThread("CameraThread").apply { start() }
+        cameraHandler = Handler(cameraThread!!.looper)
+        
         if (hasCameraPermission()) {
             initializeCamera()
         } else {
@@ -96,10 +99,10 @@ class MainActivity : AppCompatActivity() {
         liveDot = findViewById(R.id.liveDot)
         networkType = findViewById(R.id.networkType)
         networkBandwidth = findViewById(R.id.networkBandwidth)
+        ipAddress = findViewById(R.id.ipAddress)
         resolutionBadge = findViewById(R.id.resolutionBadge)
         btnStream = findViewById(R.id.btnStream)
         
-        // Collect resolution buttons
         resolutionButtons = listOf(
             findViewById(R.id.btn4K),
             findViewById(R.id.btn1080p),
@@ -108,9 +111,37 @@ class MainActivity : AppCompatActivity() {
         )
     }
     
+    private fun displayIpAddress() {
+        try {
+            val ip = getDeviceIp()
+            ipAddress.text = "IP: $ip"
+            ipAddress.visibility = View.VISIBLE
+        } catch (e: Exception) {
+            ipAddress.text = "IP: unknown"
+        }
+    }
+    
+    private fun getDeviceIp(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val networkInterface = interfaces.nextElement()
+                val addresses = networkInterface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val address = addresses.nextElement()
+                    if (!address.isLoopbackAddress && address is Inet4Address) {
+                        return address.hostAddress ?: "unknown"
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+        return "unknown"
+    }
+    
     override fun onResume() {
         super.onResume()
-        cameraEngine.initialize(this)
     }
     
     override fun onPause() {
@@ -118,20 +149,20 @@ class MainActivity : AppCompatActivity() {
         if (isStreaming) {
             stopStreaming()
         }
-        cameraEngine.closeCamera()
+        closeCamera()
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        cameraEngine.shutdown()
+        closeCamera()
         streamServer.stop()
         discoveryService.stop()
         networkMonitor.stopMonitoring()
+        cameraThread?.quitSafely()
         scope.cancel()
     }
     
     private fun setupListeners() {
-        // Resolution buttons with animation
         resolutionButtons.forEachIndexed { index, button ->
             button.setOnClickListener {
                 val resolution = when (index) {
@@ -145,7 +176,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Stream button
         btnStream.setOnClickListener {
             if (isStreaming) {
                 stopStreaming()
@@ -154,7 +184,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // TextureView listener
         previewView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
                 adjustPreviewRatio(width, height)
@@ -166,11 +195,9 @@ class MainActivity : AppCompatActivity() {
             }
             
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = true
-            
             override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
         }
         
-        // Discovery callback
         discoveryService.onLaptopFound = { laptop ->
             scope.launch {
                 updateStatus("Found: ${laptop.name}", StatusType.CONNECTING)
@@ -178,13 +205,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Network callback
         networkMonitor.onConnectionChanged = { connection ->
             scope.launch {
                 networkType.text = connection.type.name
-                networkBandwidth.text = "${connection.bandwidth.toInt()} Mbps available"
-                
-                // Animate bandwidth update
+                networkBandwidth.text = "${connection.bandwidth.toInt()} Mbps"
                 animateBandwidthUpdate()
             }
         }
@@ -220,41 +244,152 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        val texture = previewView.surfaceTexture ?: run {
-            updateStatus("Surface not ready", StatusType.CONNECTING)
-            return
-        }
-        val surface = Surface(texture)
-        val opened = cameraEngine.openCamera(surface, CameraConfig())
+        val manager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         
-        if (opened) {
-            updateStatus("Camera ready", StatusType.READY)
+        try {
+            val cameraId = getBackCameraId(manager) ?: run {
+                updateStatus("No camera found", StatusType.ERROR)
+                return
+            }
             
-            // Start discovery
-            discoveryService.start()
-            networkMonitor.startMonitoring()
-            
-            // Broadcast discovery
-            val phoneInfo = PhoneInfo(
-                name = android.os.Build.MODEL,
-                ip = discoveryService.getDeviceIp() ?: "unknown",
-                port = 8080,
-                protocols = listOf("mjpeg", "h264"),
-                resolutions = listOf("4k", "1080p", "720p")
+            manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
+                override fun onOpened(camera: CameraDevice) {
+                    cameraDevice = camera
+                    createCaptureSession()
+                }
+                
+                override fun onDisconnected(camera: CameraDevice) {
+                    camera.close()
+                    cameraDevice = null
+                    updateStatus("Camera disconnected", StatusType.ERROR)
+                }
+                
+                override fun onError(camera: CameraDevice, error: Int) {
+                    camera.close()
+                    cameraDevice = null
+                    updateStatus("Camera error: $error", StatusType.ERROR)
+                }
+            }, cameraHandler)
+        } catch (e: SecurityException) {
+            updateStatus("Camera permission denied", StatusType.ERROR)
+        } catch (e: CameraAccessException) {
+            updateStatus("Camera access error", StatusType.ERROR)
+        }
+    }
+    
+    private fun getBackCameraId(manager: CameraManager): String? {
+        for (id in manager.cameraIdList) {
+            val characteristics = manager.getCameraCharacteristics(id)
+            val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+            if (facing == CameraCharacteristics.LENS_FACING_BACK) {
+                return id
+            }
+        }
+        return null
+    }
+    
+    private fun createCaptureSession() {
+        val camera = cameraDevice ?: return
+        
+        val texture = previewView.surfaceTexture ?: return
+        texture.setDefaultBufferSize(1920, 1080)
+        val previewSurface = Surface(texture)
+        
+        // Create ImageReader for streaming
+        imageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 2)
+        imageReader?.setOnImageAvailableListener({ reader ->
+            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+            try {
+                val buffer = image.planes[0].buffer
+                val bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+                
+                // Convert to bitmap and send
+                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (bitmap != null && isStreaming) {
+                    streamServer.sendFrame(bitmap)
+                }
+            } catch (e: Exception) {
+                // Ignore frame errors
+            } finally {
+                image.close()
+            }
+        }, cameraHandler)
+        
+        val surfaces = mutableListOf(previewSurface)
+        imageReader?.surface?.let { surfaces.add(it) }
+        
+        try {
+            camera.createCaptureSession(
+                surfaces,
+                object : CameraCaptureSession.StateCallback() {
+                    override fun onConfigured(session: CameraCaptureSession) {
+                        captureSession = session
+                        startPreview()
+                        updateStatus("Camera ready", StatusType.READY)
+                        
+                        discoveryService.start()
+                        networkMonitor.startMonitoring()
+                        
+                        val phoneInfo = PhoneInfo(
+                            name = android.os.Build.MODEL,
+                            ip = getDeviceIp(),
+                            port = 8080,
+                            protocols = listOf("mjpeg"),
+                            resolutions = listOf("4k", "1080p", "720p")
+                        )
+                        discoveryService.broadcastDiscovery(phoneInfo)
+                    }
+                    
+                    override fun onConfigureFailed(session: CameraCaptureSession) {
+                        updateStatus("Session config failed", StatusType.ERROR)
+                    }
+                },
+                cameraHandler
             )
-            discoveryService.broadcastDiscovery(phoneInfo)
-        } else {
-            updateStatus("Camera unavailable", StatusType.ERROR)
+        } catch (e: CameraAccessException) {
+            updateStatus("Session error", StatusType.ERROR)
+        }
+    }
+    
+    private fun startPreview() {
+        val camera = cameraDevice ?: return
+        val session = captureSession ?: return
+        
+        try {
+            val builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+            previewView.surfaceTexture?.let { texture ->
+                texture.setDefaultBufferSize(1920, 1080)
+                builder.addTarget(Surface(texture))
+            }
+            imageReader?.surface?.let { builder.addTarget(it) }
+            
+            builder.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+            
+            session.setRepeatingRequest(builder.build(), null, cameraHandler)
+        } catch (e: CameraAccessException) {
+            // Ignore
+        }
+    }
+    
+    private fun closeCamera() {
+        try {
+            captureSession?.close()
+            captureSession = null
+            cameraDevice?.close()
+            cameraDevice = null
+            imageReader?.close()
+            imageReader = null
+        } catch (e: Exception) {
+            // Ignore
         }
     }
     
     private fun startStreaming() {
         isStreaming = true
         
-        // Animate button
         animateStreamButton(true)
         
-        // Show live indicator
         liveIndicator.visibility = View.VISIBLE
         liveIndicator.alpha = 0f
         liveIndicator.animate()
@@ -262,10 +397,8 @@ class MainActivity : AppCompatActivity() {
             .setDuration(300)
             .start()
         
-        // Pulse live dot
         startLiveDotAnimation()
-        
-        updateStatus("Streaming", StatusType.STREAMING)
+        updateStatus("Streaming on port 8080", StatusType.STREAMING)
         
         streamServer.start()
     }
@@ -273,10 +406,8 @@ class MainActivity : AppCompatActivity() {
     private fun stopStreaming() {
         isStreaming = false
         
-        // Animate button
         animateStreamButton(false)
         
-        // Hide live indicator
         liveIndicator.animate()
             .alpha(0f)
             .setDuration(200)
@@ -299,7 +430,6 @@ class MainActivity : AppCompatActivity() {
             else -> "AUTO"
         }
         
-        // Animate badge update
         resolutionBadge.animate()
             .scaleX(1.2f)
             .scaleY(1.2f)
@@ -328,8 +458,8 @@ class MainActivity : AppCompatActivity() {
             StatusType.ERROR -> getColor(R.color.status_error)
         }
         
-        val drawable = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
+        val drawable = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
             setColor(dotColor)
         }
         statusDot.background = drawable
@@ -338,9 +468,8 @@ class MainActivity : AppCompatActivity() {
     // Animations
     private fun animateUIOnStart() {
         val controlPanel = findViewById<LinearLayout>(R.id.controlPanel)
-        val statusCard = findViewById<com.google.android.material.card.MaterialCardView>(R.id.statusCard)
+        val statusCard = findViewById<MaterialCardView>(R.id.statusCard)
         
-        // Fade in and slide up control panel
         controlPanel.alpha = 0f
         controlPanel.translationY = 100f
         controlPanel.animate()
@@ -350,7 +479,6 @@ class MainActivity : AppCompatActivity() {
             .setInterpolator(OvershootInterpolator(1.2f))
             .start()
         
-        // Fade in status card
         statusCard.alpha = 0f
         statusCard.translationX = -50f
         statusCard.animate()
@@ -386,17 +514,6 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun animateStreamButton(starting: Boolean) {
-        val colorFrom = if (starting) getColor(R.color.primary) else getColor(R.color.status_error)
-        val colorTo = if (starting) getColor(R.color.status_error) else getColor(R.color.primary)
-        
-        val colorAnimation = ValueAnimator.ofObject(ArgbEvaluator(), colorFrom, colorTo)
-        colorAnimation.duration = 300
-        colorAnimation.addUpdateListener { animator ->
-            btnStream.backgroundTintList = 
-                ContextCompat.getColorStateList(this, R.color.primary)
-        }
-        colorAnimation.start()
-        
         btnStream.text = if (starting) "Stop Streaming" else "Start Streaming"
         btnStream.animate()
             .scaleX(0.95f)
@@ -444,18 +561,18 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun hasCameraPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
     
     private fun requestCameraPermission() {
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
+        androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
     }
     
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
             CAMERA_PERMISSION_CODE -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     initializeCamera()
                 } else {
                     Toast.makeText(this, "Camera permission is required", Toast.LENGTH_LONG).show()

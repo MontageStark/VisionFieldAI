@@ -29,23 +29,30 @@ class CameraEngine(private val context: Context) {
         cameraHandler = Handler(cameraThread!!.looper)
     }
     
-    fun openCamera(surface: Surface, config: CameraConfig = CameraConfig()) {
+    fun openCamera(surface: Surface, config: CameraConfig = CameraConfig()): Boolean {
         currentConfig = config
         previewSurface = surface
         
         val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         
-        try {
+        return try {
             if (!cameraOpenLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-                throw RuntimeException("Camera lock timeout")
+                return false
             }
             
             val cameraId = getBackCameraId(manager)
             if (cameraId != null) {
                 manager.openCamera(cameraId, stateCallback, cameraHandler)
+                true
+            } else {
+                false
             }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+            false
         } catch (e: CameraAccessException) {
             e.printStackTrace()
+            false
         }
     }
     

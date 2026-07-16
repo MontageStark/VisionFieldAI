@@ -26,7 +26,7 @@ class NetworkMonitor(private val context: Context) {
                 val connection = measureConnection()
                 if (connection != currentConnection) {
                     currentConnection = connection
-                    onConnectionChanged?.invoke(connection)
+                    connection?.let { onConnectionChanged?.invoke(it) }
                 }
                 delay(5000) // Measure every 5 seconds
             }
