@@ -1,0 +1,4 @@
+backend\STATE_MACHINE_REPORT.md
+docs\superpowers\plans\2026-07-14-fieldvision-ai.md
+docs\superpowers\specs\2026-07-14-ai-football-camera-design.md
+frontend\public\favicon.svg
