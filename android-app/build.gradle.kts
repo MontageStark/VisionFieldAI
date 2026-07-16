@@ -1,6 +1,6 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
-    val kotlinVersion by project("kotlinVersion" to "1.9.0")
+    val kotlinVersion = "1.9.0"
     repositories {
         google()
         mavenCentral()
