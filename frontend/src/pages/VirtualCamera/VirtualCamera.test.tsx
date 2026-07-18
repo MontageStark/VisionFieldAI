@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithRouter, screen } from '@/test/test-utils';
 import { VirtualCamera } from '@/pages/VirtualCamera/VirtualCamera';
+import { fireEvent } from '@testing-library/react';
 
 vi.mock('@/services/api', () => ({
   outputApi: {
@@ -35,5 +36,26 @@ describe('VirtualCamera', () => {
   it('shows current zoom value', () => {
     renderWithRouter(<VirtualCamera />);
     expect(screen.getByText('1.5x')).toBeInTheDocument();
+  });
+
+  it('updates zoom value on slider change', () => {
+    renderWithRouter(<VirtualCamera />);
+    const zoomSlider = screen.getAllByRole('slider')[0];
+    fireEvent.change(zoomSlider, { target: { value: '3' } });
+    expect(screen.getByText('3.0x')).toBeInTheDocument();
+  });
+
+  it('updates dead zone on slider change', () => {
+    renderWithRouter(<VirtualCamera />);
+    const deadZoneSlider = screen.getAllByRole('slider')[1];
+    fireEvent.change(deadZoneSlider, { target: { value: '40' } });
+    expect(screen.getByText('40%')).toBeInTheDocument();
+  });
+
+  it('updates motion speed on slider change', () => {
+    renderWithRouter(<VirtualCamera />);
+    const motionSlider = screen.getAllByRole('slider')[2];
+    fireEvent.change(motionSlider, { target: { value: '75' } });
+    expect(screen.getByText('75%')).toBeInTheDocument();
   });
 });

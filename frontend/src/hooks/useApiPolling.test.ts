@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useApiPolling } from '@/hooks/useApiPolling';
 
 describe('useApiPolling', () => {
@@ -50,5 +50,34 @@ describe('useApiPolling', () => {
     const fetcher = vi.fn().mockResolvedValue({ data: 'test' });
     renderHook(() => useApiPolling(fetcher, 5000, { enabled: false }));
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('refetch calls fetcher manually', async () => {
+    const fetcher = vi.fn().mockResolvedValue({ data: 'test' });
+    const { result } = renderHook(() => useApiPolling(fetcher, 5000));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    fetcher.mockClear();
+    await act(async () => {
+      await result.current.refetch();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(result.current.data).toEqual({ data: 'test' });
+  });
+
+  it('refetch handles errors', async () => {
+    const fetcher = vi.fn().mockResolvedValue({ data: 'ok' });
+    const { result } = renderHook(() => useApiPolling(fetcher, 5000));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    fetcher.mockRejectedValue(new Error('Refetch fail'));
+    await act(async () => {
+      await result.current.refetch();
+    });
+    expect(result.current.error).toBe('Refetch fail');
+  });
+
+  it('returns string error for non-Error rejections', async () => {
+    const fetcher = vi.fn().mockRejectedValue('string error');
+    const { result } = renderHook(() => useApiPolling(fetcher, 1000));
+    await waitFor(() => expect(result.current.error).toBe('string error'));
   });
 });
