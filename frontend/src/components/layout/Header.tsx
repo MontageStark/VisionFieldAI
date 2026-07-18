@@ -1,42 +1,43 @@
-import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { systemApi } from '@/services/api';
 import { useSystemStore } from '@/stores/systemStore';
-import { wsClient } from '@/services/websocket';
 
-const titleByPath: Record<string, string> = {
+const routeTitles: Record<string, string> = {
   '/': 'Dashboard',
-  '/camera': 'Camera Control',
-  '/servo': 'Servo Control',
-  '/director': 'Director Mode',
+  '/camera': 'Camera',
+  '/director': 'AI Director',
   '/streaming': 'Streaming',
-  '/replay': 'Replay Viewer',
-  '/health': 'System Health',
-  '/logs': 'Logs',
-  '/plugins': 'Plugin Marketplace',
-  '/calibration': 'Calibration Wizard',
+  '/servo': 'Hardware',
+  '/analytics': 'Analytics',
+  '/replay': 'Replay',
+  '/recording': 'Recording',
+  '/matches': 'Matches',
   '/settings': 'Settings',
+  '/logs': 'Logs',
 };
 
 function pageTitle(pathname: string): string {
-  if (titleByPath[pathname]) return titleByPath[pathname];
-  // Match dynamic routes
-  for (const key of Object.keys(titleByPath)) {
-    if (key !== '/' && pathname.startsWith(key)) return titleByPath[key]!;
+  if (routeTitles[pathname]) return routeTitles[pathname];
+  for (const key of Object.keys(routeTitles)) {
+    if (key !== '/' && pathname.startsWith(key)) return routeTitles[key];
   }
   return 'FieldVision AI';
 }
 
-function statusColor(s: ReturnType<typeof useSystemStore.getState>['wsStatus']): string {
+function stateColor(state: string): string {
+  switch (state) {
+    case 'STREAMING': return 'bg-accent-success';
+    case 'TRACKING': return 'bg-primary-500';
+    case 'IDLE': return 'bg-accent-warning';
+    default: return 'bg-slate-500';
+  }
+}
+
+function wsColor(s: string): string {
   switch (s) {
-    case 'open':
-      return 'bg-emerald-500';
-    case 'connecting':
-      return 'bg-amber-500';
-    case 'error':
-      return 'bg-rose-500';
-    default:
-      return 'bg-slate-500';
+    case 'open': return 'bg-accent-success';
+    case 'connecting': return 'bg-accent-warning';
+    case 'error': return 'bg-accent-error';
+    default: return 'bg-slate-500';
   }
 }
 
@@ -45,57 +46,40 @@ export function Header(): JSX.Element {
   const systemState = useSystemStore((s) => s.systemState);
   const apiConnected = useSystemStore((s) => s.apiConnected);
   const wsStatus = useSystemStore((s) => s.wsStatus);
-  const setApiConnected = useSystemStore((s) => s.setApiConnected);
-  const setWsStatus = useSystemStore((s) => s.setWsStatus);
-  const setSystemState = useSystemStore((s) => s.setSystemState);
-  const setError = useSystemStore((s) => s.setError);
 
-  useEffect(() => {
-    let cancelled = false;
-    systemApi
-      .status()
-      .then((data) => {
-        if (cancelled) return;
-        setSystemState(data.state, data.valid_transitions);
-        setApiConnected(true);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setApiConnected(false);
-        setError(err?.message ?? 'API unreachable');
-      });
-
-    const unsubscribeStatus = wsClient.onStatus((s) => setWsStatus(s));
-    wsClient.connect();
-
-    return () => {
-      cancelled = true;
-      unsubscribeStatus();
-    };
-  }, [setApiConnected, setError, setSystemState, setWsStatus]);
+  const isLive = systemState === 'STREAMING' || systemState === 'TRACKING';
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-950/60 px-6">
-      <div>
+    <header className="flex h-16 items-center justify-between border-b border-dark-border bg-dark-surface px-6" data-testid="header">
+      <div className="flex items-center gap-4">
         <h1 className="text-lg font-semibold text-white">{pageTitle(location.pathname)}</h1>
-        <p className="text-xs text-slate-400">
-          System state: <span className="font-mono text-slate-200">{systemState}</span>
-        </p>
+        {isLive && (
+          <span data-testid="live-indicator" className="flex items-center gap-1.5 rounded-full bg-accent-error/10 px-2.5 py-0.5 text-xs font-medium text-accent-error">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-error animate-pulse-live" />
+            LIVE
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-4 text-xs">
+        <span
+          data-testid="system-state"
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-medium ${stateColor(systemState)} bg-opacity-10 text-white`}
+        >
+          {systemState}
+        </span>
         <div className="flex items-center gap-2">
           <span
-            className={`inline-block h-2.5 w-2.5 rounded-full ${apiConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}
-            aria-hidden="true"
+            data-testid="api-status"
+            className={`inline-block h-2.5 w-2.5 rounded-full ${apiConnected ? 'bg-accent-success' : 'bg-accent-error'}`}
           />
-          <span className="text-slate-300">API</span>
+          <span className="text-slate-400">API</span>
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`inline-block h-2.5 w-2.5 rounded-full ${statusColor(wsStatus)}`}
-            aria-hidden="true"
+            data-testid="ws-status"
+            className={`inline-block h-2.5 w-2.5 rounded-full ${wsColor(wsStatus)}`}
           />
-          <span className="text-slate-300">WS: {wsStatus}</span>
+          <span className="text-slate-400">WS</span>
         </div>
       </div>
     </header>

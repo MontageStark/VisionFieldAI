@@ -1,51 +1,77 @@
-import { useEffect } from 'react';
-import { useAppStore } from '@/stores/appStore';
+import { useState } from 'react';
 
-export default function Settings(): JSX.Element {
-  const { outputMode, setOutputMode, fetchOutputState } = useAppStore();
+const tabs = ['General', 'Camera', 'AI', 'Virtual Camera', 'Servo', 'Streaming', 'OBS', 'Notifications'];
 
-  useEffect(() => {
-    fetchOutputState();
-  }, [fetchOutputState]);
+export function Settings(): JSX.Element {
+  const [activeTab, setActiveTab] = useState('General');
 
   return (
-    <div className="space-y-6">
-      <section className="bg-dark-800 rounded-xl p-6 border border-dark-600">
-        <h2 className="text-lg font-semibold text-white mb-4">Camera Output</h2>
-        <p className="text-dark-400 text-sm mb-4">
-          Choose how the AI Director's decisions are rendered. Virtual Camera is the default — no hardware required.
-        </p>
-        <div className="space-y-3">
-          {[
-            { value: 'virtual', label: 'Virtual Camera', desc: 'Crop/pan/zoom in software — no hardware needed' },
-            { value: 'servo', label: 'Servo Camera', desc: 'Control servo motors via ESP32' },
-            { value: 'hybrid', label: 'Hybrid', desc: 'Servo + virtual camera fine-tuning' },
-            { value: 'ptz', label: 'PTZ Camera', desc: 'ONVIF-based professional PTZ camera' },
-          ].map(opt => (
-            <label
-              key={opt.value}
-              className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                outputMode === opt.value
-                  ? 'bg-primary-500/10 border border-primary-500/30'
-                  : 'bg-dark-700 border border-dark-600 hover:border-dark-500'
-              }`}
-            >
-              <input
-                type="radio"
-                name="outputMode"
-                value={opt.value}
-                checked={outputMode === opt.value}
-                onChange={() => setOutputMode(opt.value as any)}
-                className="mt-1 accent-primary-500"
-              />
-              <div>
-                <div className="text-white font-medium">{opt.label}</div>
-                <div className="text-dark-400 text-sm">{opt.desc}</div>
-              </div>
-            </label>
-          ))}
+    <div className="space-y-6 p-6">
+      <h2 className="text-xl font-bold text-white">Settings</h2>
+
+      <div className="flex gap-1 rounded-xl border border-dark-border bg-dark-surface p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === tab
+                ? 'bg-primary-500/20 text-primary-400'
+                : 'text-slate-400 hover:bg-dark-card'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-dark-border bg-dark-card p-6">
+        <div style={{ display: activeTab === 'General' ? 'block' : 'none' }}>
+          <h3 className="mb-4 text-lg font-semibold text-white">General Settings</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-300">Theme</span>
+              <select className="rounded-lg border border-dark-border bg-dark-surface px-3 py-1.5 text-sm text-white">
+                <option>Dark</option>
+              </select>
+            </div>
+          </div>
         </div>
-      </section>
+
+        <div style={{ display: activeTab === 'AI' ? 'block' : 'none' }}>
+          <div className="space-y-4">
+            <h3 className="mb-4 text-lg font-semibold text-white">AI Settings</h3>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-300">Detection Model</span>
+              <span className="text-sm font-bold text-primary-400">YOLO11</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-300">Tracker</span>
+              <span className="text-sm font-bold text-primary-400">ByteTrack</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-300">Motion Style</span>
+              <select className="rounded-lg border border-dark-border bg-dark-surface px-3 py-1.5 text-sm text-white">
+                <option>Smooth</option>
+              </select>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-300">Aggressiveness</span>
+              <input type="range" min="1" max="10" defaultValue="5" className="w-32 accent-primary-500" />
+            </div>
+          </div>
+        </div>
+
+        {activeTab !== 'General' && activeTab !== 'AI' && (
+          <div>
+            <h3 className="mb-4 text-lg font-semibold text-white">{activeTab} Settings</h3>
+            <p className="text-sm text-slate-400">Configure {activeTab.toLowerCase()} settings here.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+export default Settings;
