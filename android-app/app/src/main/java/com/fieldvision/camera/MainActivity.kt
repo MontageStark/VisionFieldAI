@@ -301,9 +301,9 @@ class MainActivity : AppCompatActivity() {
         texture.setDefaultBufferSize(1920, 1080)
         val previewSurface = Surface(texture)
         
-        // Full HD streaming
-        val streamWidth = 1920
-        val streamHeight = 1080
+        // 720p streaming - balance of quality and performance for WiFi
+        val streamWidth = 1280
+        val streamHeight = 720
         
         // Use JPEG capture - camera ISP handles color conversion correctly
         imageReader = ImageReader.newInstance(streamWidth, streamHeight, ImageFormat.JPEG, 2)
@@ -374,8 +374,8 @@ class MainActivity : AppCompatActivity() {
         val camera = cameraDevice ?: return
         val session = captureSession ?: return
         
-        val streamWidth = 1920
-        val streamHeight = 1080
+        val streamWidth = 1280
+        val streamHeight = 720
         
         try {
             // Preview request at full resolution

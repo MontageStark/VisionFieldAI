@@ -69,7 +69,8 @@ class CameraService:
         if not self._source.is_opened():
             opened = self._source.open()
             if not opened and not self._source.is_opened():
-                raise CameraServiceError("Failed to open video source")
+                # Let capture loop handle reconnection instead of failing immediately
+                pass
 
         self._stop_event.clear()
         self._running = True

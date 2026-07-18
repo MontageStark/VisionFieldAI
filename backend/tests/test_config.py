@@ -301,8 +301,8 @@ class TestLoadAllYamlConfigs:
     def test_camera_values_from_yaml(self):
         data = _load_all_yaml_configs(CONFIGS_DIR)
         assert data["camera"]["device_id"] == 0
-        assert data["camera"]["width"] == 1920
-        assert data["camera"]["height"] == 1080
+        assert data["camera"]["resolution"]["width"] == 3840
+        assert data["camera"]["resolution"]["height"] == 2160
         assert data["camera"]["fps"] == 30
 
     def test_ai_values_from_yaml(self):

@@ -208,12 +208,12 @@ class TestCameraServiceLifecycle:
         svc.stop()
         assert fake_source.release_called
 
-    def test_start_when_source_fails_to_open_raises(self) -> None:
+    def test_start_when_source_fails_to_open_continues(self) -> None:
         bad = FakeVideoSource(open_should_fail=True)
-        svc = CameraService(source=bad, buffer_size=4)
-        with pytest.raises(CameraServiceError):
-            svc.start()
-        assert not svc.is_running
+        svc = CameraService(source=bad, buffer_size=4, reconnect_interval=0.05)
+        svc.start()
+        assert svc.is_running
+        svc.stop()
 
     def test_double_start_is_idempotent(self, fake_source: FakeVideoSource) -> None:
         svc = CameraService(source=fake_source, buffer_size=4)

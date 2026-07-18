@@ -5,11 +5,11 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+*.egg-info/
 
 # Build outputs
 build/
 dist/
-*.egg-info/
 *.egg
 
 # Virtual environments
@@ -44,10 +44,26 @@ coverage.xml
 android-app/.gradle/
 android-app/app/build/
 android-app/local.properties
+android-app/build/
+android-app/captures/
 
 # Frontend
 frontend/dist/
 frontend/node_modules/
+frontend/.vite/
 
-# ECC
+# ECC / OpenCode
 .opencode-state/
+.mcp.json
+
+# Embedded repos (managed separately)
+ecc-affaan/
+headroom/
+ponytail/
+
+# Rust tools
+target/
+
+# Python
+*.pyd
+.python-version

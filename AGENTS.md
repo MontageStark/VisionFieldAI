@@ -1,6 +1,6 @@
 # FieldVision AI — Agent Instructions
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **ECC Integration:** v2.0.0
 
 ## Core Principles
@@ -11,6 +11,29 @@
 4. **No blocking loops** — Async/await everywhere
 5. **No hardcoded values** — All config in YAML files
 6. **No spaghetti code** — Clean, modular architecture
+
+## Ponytail Philosophy — Lazy Senior Developer
+
+**Before writing any code, stop at the first rung that holds:**
+
+1. Does this need to be built at all? (YAGNI)
+2. Does it already exist in this codebase? Reuse it.
+3. Does the standard library already do this? Use it.
+4. Does a native platform feature cover it? Use it.
+5. Does an already-installed dependency solve it? Use it.
+6. Can this be one line? Make it one line.
+7. Only then: write the minimum code that works.
+
+**Rules:**
+- No abstractions that weren't explicitly requested
+- No new dependency if it can be avoided
+- No boilerplate nobody asked for
+- Deletion over addition. Boring over clever. Fewest files possible
+- Shortest working diff wins (but understand the problem first)
+- Question complex requests: "Do you actually need X, or does Y cover it?"
+- Mark deliberate simplifications with `ponytail:` comment naming the ceiling and upgrade path
+
+**Not lazy about:** Understanding the problem fully, input validation at trust boundaries, error handling that prevents data loss, security, accessibility, calibration real hardware needs.
 
 ## Architecture
 
@@ -35,10 +58,20 @@ Use ECC agents proactively:
 
 ## Testing Requirements
 
-- **Minimum coverage:** 80%
-- **Backend:** pytest with PYTHONPATH="D:\FieldVision AI;D:\FieldVision AI\backend"
-- **Android:** JUnit + Espresso
-- **TDD mandatory:** Write tests before implementation
+**Minimum coverage:** 80%
+
+**TDD Workflow (mandatory):**
+1. **RED** — Write test first, verify it FAILS
+2. **GREEN** — Write minimal implementation, verify test PASSES
+3. **REFACTOR** — Improve code quality, verify coverage 80%+
+
+**Test types (all required):**
+1. **Unit tests** — Individual functions, utilities, components
+2. **Integration tests** — API endpoints, database operations
+3. **E2E tests** — Critical user flows (Playwright)
+
+**Backend:** pytest with PYTHONPATH="D:\FieldVision AI;D:\FieldVision AI\backend"
+**Android:** JUnit + Espresso
 
 ## Security Guidelines
 
