@@ -58,6 +58,7 @@ class NetworkMonitor(private val context: Context) {
                 else -> ConnectionType.UNKNOWN
             }
             
+            // ponytail: hardcoded estimates. ceiling: linkUpstreamBandwidthKbps() on API 29+
             val bandwidth = when (type) {
                 ConnectionType.WIFI -> 50.0
                 ConnectionType.CELLULAR -> 10.0
