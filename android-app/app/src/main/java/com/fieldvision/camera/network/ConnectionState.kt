@@ -1,26 +1,13 @@
 package com.fieldvision.camera.network
 
-import com.fieldvision.camera.camera.Resolution
-
 data class ConnectionState(
     val type: ConnectionType,
-    val bandwidth: Double,  // Mbps
-    val latency: Long,     // ms
-    val recommendedResolution: Resolution
+    val bandwidth: Double,
+    val latency: Long,
 )
 
 enum class ConnectionType {
     WIFI,
-    HOTSPOT,
-    WIFI_DIRECT,
-    VENUE_WIFI,
     CELLULAR,
     UNKNOWN
 }
-
-data class BandwidthMeasurement(
-    val downloadSpeed: Double,  // Mbps
-    val uploadSpeed: Double,    // Mbps
-    val latency: Long,          // ms
-    val timestamp: Long
-)
