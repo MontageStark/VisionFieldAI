@@ -132,6 +132,20 @@ class MainActivity : AppCompatActivity() {
                 CameraNavHost(viewModel = viewModel)
             }
         }
+        
+        // Bridge Compose ViewModel streaming state → Activity StreamServer
+        scope.launch {
+            viewModel.uiState.collect { state ->
+                android.util.Log.i("MainActivity", "VM state: isStreaming=${state.isStreaming}, isCamera=${state.isCameraConnected}, isWifi=${state.isWifiConnected}, activityStreaming=$isStreaming")
+                if (state.isStreaming && !isStreaming) {
+                    android.util.Log.i("MainActivity", "Starting stream server from Compose")
+                    startStreamServer()
+                } else if (!state.isStreaming && isStreaming) {
+                    android.util.Log.i("MainActivity", "Stopping stream server from Compose")
+                    stopStreamServer()
+                }
+            }
+        }
     }
     
     private fun displayIpAddress() {
@@ -529,37 +543,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startStreaming() {
+    private fun startStreamServer() {
         isStreaming = true
-        
-        // Sync with Compose ViewModel
-        viewModel.goLive()
-        viewModel.updateCameraState(true)
-        
         animateStreamButton(true)
-        
         liveIndicator.visibility = View.VISIBLE
         liveIndicator.alpha = 0f
         liveIndicator.animate()
             .alpha(1f)
             .setDuration(300)
             .start()
-        
         startLiveDotAnimation()
         updateStatus("Streaming on port 8080", StatusType.STREAMING)
-        
         streamServer.start()
     }
     
-    private fun stopStreaming() {
+    private fun stopStreamServer() {
         isStreaming = false
-        
-        // Sync with Compose ViewModel
-        viewModel.stopLive()
-        viewModel.navigateTo(com.fieldvision.camera.ui.Screen.Home)
-        
         animateStreamButton(false)
-        
         liveIndicator.animate()
             .alpha(0f)
             .setDuration(200)
@@ -567,10 +567,20 @@ class MainActivity : AppCompatActivity() {
                 liveIndicator.visibility = View.GONE
             }
             .start()
-        
         updateStatus("Stream stopped", StatusType.READY)
-        
         streamServer.stop()
+    }
+    
+    private fun startStreaming() {
+        startStreamServer()
+        viewModel.goLive()
+        viewModel.updateCameraState(true)
+    }
+    
+    private fun stopStreaming() {
+        stopStreamServer()
+        viewModel.stopLive()
+        viewModel.navigateTo(com.fieldvision.camera.ui.Screen.Home)
     }
     
     private fun setResolution(resolution: Resolution?) {

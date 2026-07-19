@@ -141,7 +141,7 @@ fun HomeScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Primary500,
                 ),
-                enabled = uiState.isCameraConnected && uiState.isWifiConnected,
+                enabled = uiState.isCameraConnected,
             ) {
                 Box(
                     modifier = Modifier

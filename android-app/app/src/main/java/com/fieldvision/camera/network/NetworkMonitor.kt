@@ -55,22 +55,23 @@ class NetworkMonitor(private val context: Context) {
             val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return null
             
             val connectionType = when {
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
-                    if (isHotspot()) ConnectionType.HOTSPOT else ConnectionType.WIFI
-                }
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> ConnectionType.UNKNOWN
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> ConnectionType.WIFI
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> ConnectionType.CELLULAR
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> ConnectionType.WIFI
                 else -> ConnectionType.UNKNOWN
             }
             
-            val bandwidth = measureBandwidth()
-            val latency = measureLatency()
-            val resolution = calculateResolution(bandwidth)
+            val bandwidth = when (connectionType) {
+                ConnectionType.WIFI -> 50.0
+                ConnectionType.CELLULAR -> 10.0
+                else -> 0.0
+            }
             
             ConnectionState(
                 type = connectionType,
                 bandwidth = bandwidth,
-                latency = latency,
-                recommendedResolution = resolution
+                latency = 0,
+                recommendedResolution = calculateResolution(bandwidth)
             )
         } catch (e: Exception) {
             Log.e(TAG, "Connection measurement error: ${e.message}")

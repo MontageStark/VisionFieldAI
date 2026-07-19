@@ -30,7 +30,7 @@ class StreamServer(private val port: Int = 8080) {
             try {
                 serverSocket = ServerSocket(port)
                 isRunning = true
-                Log.d(TAG, "Stream server started on port $port")
+                Log.i(TAG, "Stream server started on port $port")
                 
                 while (isActive) {
                     val clientSocket = serverSocket?.accept() ?: break
@@ -111,7 +111,7 @@ class StreamServer(private val port: Int = 8080) {
                 }
                 
                 onClientConnected?.invoke()
-                Log.d(TAG, "Client connected: ${socket.inetAddress}")
+                Log.i(TAG, "Client connected: ${socket.inetAddress}")
                 
                 // Keep connection alive until client disconnects
                 while (socket.isConnected && !socket.isClosed) {

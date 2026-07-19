@@ -14,6 +14,7 @@ enum class ConnectionType {
     HOTSPOT,
     WIFI_DIRECT,
     VENUE_WIFI,
+    CELLULAR,
     UNKNOWN
 }
 
