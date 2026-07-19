@@ -22,13 +22,18 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
 import com.fieldvision.camera.camera.CameraConfig
 import com.fieldvision.camera.camera.Resolution
 import com.fieldvision.camera.discovery.DiscoveryService
 import com.fieldvision.camera.discovery.PhoneInfo
 import com.fieldvision.camera.network.NetworkMonitor
 import com.fieldvision.camera.stream.StreamServer
+import com.fieldvision.camera.ui.CameraViewModel
+import com.fieldvision.camera.ui.navigation.CameraNavHost
+import com.fieldvision.camera.ui.theme.FieldVisionTheme
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.*
@@ -66,6 +71,9 @@ class MainActivity : AppCompatActivity() {
     
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
+    // Compose ViewModel
+    private lateinit var viewModel: CameraViewModel
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -73,7 +81,11 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.statusBarColor = getColor(R.color.background_dark)
         
+        // Initialize ViewModel
+        viewModel = ViewModelProvider(this)[CameraViewModel::class.java]
+        
         initializeViews()
+        setupComposeOverlay()
         
         streamServer = StreamServer()
         discoveryService = DiscoveryService()
@@ -111,6 +123,15 @@ class MainActivity : AppCompatActivity() {
             findViewById(R.id.btn720p),
             findViewById(R.id.btnAuto)
         )
+    }
+    
+    private fun setupComposeOverlay() {
+        val composeView = findViewById<ComposeView>(R.id.composeOverlay)
+        composeView.setContent {
+            FieldVisionTheme {
+                CameraNavHost(viewModel = viewModel)
+            }
+        }
     }
     
     private fun displayIpAddress() {
@@ -212,6 +233,13 @@ class MainActivity : AppCompatActivity() {
                 networkType.text = connection.type.name
                 networkBandwidth.text = "${connection.bandwidth.toInt()} Mbps"
                 animateBandwidthUpdate()
+                
+                // Sync with Compose ViewModel
+                viewModel.updateNetworkState(
+                    wifiConnected = connection.type != com.fieldvision.camera.network.ConnectionType.UNKNOWN,
+                    strength = connection.bandwidth.toInt(),
+                    latency = connection.latency.toInt(),
+                )
             }
         }
     }
@@ -265,6 +293,7 @@ class MainActivity : AppCompatActivity() {
                     cameraDevice = null
                     runOnUiThread {
                         updateStatus("Camera disconnected", StatusType.ERROR)
+                        viewModel.updateCameraState(false)
                     }
                 }
                 
@@ -273,6 +302,7 @@ class MainActivity : AppCompatActivity() {
                     cameraDevice = null
                     runOnUiThread {
                         updateStatus("Camera error: $error", StatusType.ERROR)
+                        viewModel.updateCameraState(false)
                     }
                 }
             }, cameraHandler)
@@ -340,6 +370,7 @@ class MainActivity : AppCompatActivity() {
                         startStreamingCapture()
                         runOnUiThread {
                             updateStatus("Camera ready", StatusType.READY)
+                            viewModel.updateCameraState(true)
                         }
                         
                         discoveryService.start()
@@ -501,6 +532,10 @@ class MainActivity : AppCompatActivity() {
     private fun startStreaming() {
         isStreaming = true
         
+        // Sync with Compose ViewModel
+        viewModel.goLive()
+        viewModel.updateCameraState(true)
+        
         animateStreamButton(true)
         
         liveIndicator.visibility = View.VISIBLE
@@ -518,6 +553,10 @@ class MainActivity : AppCompatActivity() {
     
     private fun stopStreaming() {
         isStreaming = false
+        
+        // Sync with Compose ViewModel
+        viewModel.stopLive()
+        viewModel.navigateTo(com.fieldvision.camera.ui.Screen.Home)
         
         animateStreamButton(false)
         
