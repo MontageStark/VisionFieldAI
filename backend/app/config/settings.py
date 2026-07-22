@@ -15,7 +15,7 @@ class CameraSettings(BaseModel):
     buffer_size: int = Field(default=10, ge=1, le=100, description="Frame buffer size")
     
     # HTTP (phone stream) settings
-    http_url: str = Field(default="http://192.168.1.5:8080/video", description="HTTP stream URL")
+    http_url: str = Field(default="http://192.168.0.176:8080/video", description="HTTP stream URL")
     http_protocol: str = Field(default="auto", description="HTTP protocol (webrtc, h264, mjpeg, auto)")
     
     # Auto-discovery settings

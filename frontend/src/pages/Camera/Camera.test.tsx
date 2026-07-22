@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderWithRouter, screen } from '@/test/test-utils';
+import { renderWithRouter, screen, waitFor } from '@/test/test-utils';
 import { Camera } from '@/pages/Camera/Camera';
 
 vi.mock('@/services/api', () => ({
@@ -16,12 +16,14 @@ describe('Camera', () => {
     expect(screen.getByText('Input Source')).toBeInTheDocument();
     expect(screen.getByText('Resolution')).toBeInTheDocument();
     expect(screen.getByText('FPS')).toBeInTheDocument();
-    expect(screen.getByText('Latency')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
   });
 
-  it('shows camera status', () => {
+  it('shows camera status after loading', async () => {
     renderWithRouter(<Camera />);
-    expect(screen.getByText('Running')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Running')).toBeInTheDocument();
+    });
   });
 
   it('renders action buttons', () => {

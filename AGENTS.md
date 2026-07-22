@@ -1,126 +1,131 @@
 # FieldVision AI — Agent Instructions
 
-**Version:** 1.1.0
-**ECC Integration:** v2.0.0
+**Stack:** Python 3.12, FastAPI, OpenCV, YOLO11, ByteTrack, PyTorch CUDA · React 18, TypeScript, Vite, Zustand, TailwindCSS · Kotlin Android (Camera2, MJPEG) · ESP32/PlatformIO
 
-## Core Principles
+## Non-Negotiables
 
-1. **No Docker** — Runs natively on Windows
+1. **No Docker** — runs natively on Windows
 2. **No Flask** — FastAPI only
-3. **No global variables** — Event-driven via message bus
-4. **No blocking loops** — Async/await everywhere
-5. **No hardcoded values** — All config in YAML files
-6. **No spaghetti code** — Clean, modular architecture
+3. **No global variables** — event-driven via `EventBus` (pub/sub, thread-safe, `backend/app/core/events.py`)
+4. **No blocking loops** — async/await everywhere
+5. **No hardcoded values** — all config in `configs/*.yaml`
+6. **Immutability** — always create new objects, never mutate
+7. **No new dependency** if an existing one or stdlib covers it
 
-## Ponytail Philosophy — Lazy Senior Developer
+## Ponytail Philosophy
 
-**Before writing any code, stop at the first rung that holds:**
+**Before writing code, stop at the first rung that holds:**
 
-1. Does this need to be built at all? (YAGNI)
-2. Does it already exist in this codebase? Reuse it.
-3. Does the standard library already do this? Use it.
-4. Does a native platform feature cover it? Use it.
-5. Does an already-installed dependency solve it? Use it.
-6. Can this be one line? Make it one line.
-7. Only then: write the minimum code that works.
+1. Does this need to exist? (YAGNI)
+2. Already in this codebase? Reuse it.
+3. Stdlib covers it? Use it.
+4. Already-installed dep solves it? Use it.
+5. Can this be one line? Make it one line.
 
-**Rules:**
-- No abstractions that weren't explicitly requested
-- No new dependency if it can be avoided
-- No boilerplate nobody asked for
-- Deletion over addition. Boring over clever. Fewest files possible
-- Shortest working diff wins (but understand the problem first)
-- Question complex requests: "Do you actually need X, or does Y cover it?"
-- Mark deliberate simplifications with `ponytail:` comment naming the ceiling and upgrade path
+**Rules:** No unrequested abstractions. Fewest files possible. Shortest working diff. Question complex requests: "Do you actually need X?" Mark simplifications with `ponytail:`.
 
-**Not lazy about:** Understanding the problem fully, input validation at trust boundaries, error handling that prevents data loss, security, accessibility, calibration real hardware needs.
+**Not lazy about:** understanding the problem, input validation, error handling, security, hardware calibration.
 
-## Architecture
-
-- **Backend:** Python 3.12, FastAPI, OpenCV, YOLO11, ByteTrack, PyTorch CUDA
-- **Frontend:** React 18, TypeScript, Vite, TailwindCSS
-- **Mobile:** Android Kotlin, Camera2 API, MJPEG streaming
-- **Hardware:** ESP32, PlatformIO (optional servo control)
-
-## Agent Workflow
-
-Use ECC agents proactively:
-
-| Situation | Agent | Action |
-|-----------|-------|--------|
-| Complex feature | `planner` | Create implementation plan |
-| Code written | `code-reviewer` | Review for quality |
-| Bug fix | `tdd-guide` | Write tests first |
-| Security code | `security-reviewer` | Check vulnerabilities |
-| Build fails | `build-error-resolver` | Fix errors |
-| Android code | `kotlin-reviewer` | Review Kotlin patterns |
-| Python code | `python-reviewer` | Review Python patterns |
-
-## Testing Requirements
-
-**Minimum coverage:** 80%
-
-**TDD Workflow (mandatory):**
-1. **RED** — Write test first, verify it FAILS
-2. **GREEN** — Write minimal implementation, verify test PASSES
-3. **REFACTOR** — Improve code quality, verify coverage 80%+
-
-**Test types (all required):**
-1. **Unit tests** — Individual functions, utilities, components
-2. **Integration tests** — API endpoints, database operations
-3. **E2E tests** — Critical user flows (Playwright)
-
-**Backend:** pytest with PYTHONPATH="D:\FieldVision AI;D:\FieldVision AI\backend"
-**Android:** JUnit + Espresso
-
-## Security Guidelines
-
-- No hardcoded secrets (API keys, passwords, tokens)
-- All user inputs validated
-- Camera permissions handled gracefully
-- Network discovery validated
-- Rate limiting on all endpoints
-
-## Coding Style
-
-- **Immutability:** Always create new objects, never mutate
-- **File organization:** Many small files over few large ones
-- **Error handling:** Handle errors at every level
-- **Input validation:** Validate all user input at boundaries
-
-## Git Workflow
-
-**Commit format:** `<type>: <description>`
-Types: feat, fix, refactor, docs, test, chore, perf, ci
-
-## Project Structure
+## Architecture Quick-Ref
 
 ```
 backend/
   app/
-    services/     — Business logic (camera, director, tracking, etc.)
-    api/          — FastAPI routes
-    core/         — Config, events, state machines
-android-app/     — Phone camera app
-frontend/        — React dashboard
-configs/         — YAML configuration files
-tests/           — Backend test suite
+    main.py        — FastAPI entry (create_app factory, CORS, lifespan)
+    api/           — Routes: system, camera, servo, director, stream, websocket, output
+    api/deps.py    — DI: service adapters with real/mock fallback
+    core/          — EventBus, SystemStateMachine, config loader
+    services/      — camera/, director/, output/, tracking/
+    models/        — Pydantic models
+  tests/           — 22 test files (test_*.py)
+frontend/
+  src/
+    components/    — React components (use Zustand for state)
+    services/      — API client layer
+    test/setup.ts  — Vitest setup (jest-dom, fake timers)
+  vite.config.ts   — Proxy /api/* → localhost:8001, port 5173
+android-app/       — Kotlin Camera2 MJPEG streaming
+configs/           — camera.yaml, network.yaml, servo.yaml, ai.yaml, output.yaml, stream.yaml
 ```
 
-## ECC Commands Available
+## Running the Project
 
-- `/plan` — Create implementation plan
-- `/tdd` — Enforce TDD workflow
-- `/code-review` — Review code quality
-- `/security` — Security review
-- `/build-fix` — Fix build errors
-- `/refactor-clean` — Clean dead code
-- `/verify` — Run verification loop
-- `/learn` — Extract session patterns
+```bash
+# Full stack (Windows)
+start.bat                          # Backend :8001 + Frontend :5173
 
-## Performance
+# Backend only
+cd backend
+set PYTHONPATH=D:\FieldVision AI;D:\FieldVision AI\backend
+python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8001 --reload
+
+# Frontend only
+cd frontend && npm run dev          # :5173, proxies /api/* to :8001
+```
+
+## Testing
+
+**Coverage floor:** 80%. TDD mandatory (RED → GREEN → REFACTOR).
+
+```bash
+# Backend
+cd backend
+set PYTHONPATH=D:\FieldVision AI;D:\FieldVision AI\backend
+pytest                              # 22 test files in backend/tests/
+pytest --cov=app --cov-report=term-missing
+
+# Frontend
+cd frontend
+npm test                            # Vitest
+npm run test:coverage
+npm run typecheck                   # tsc --noEmit
+npm run lint                        # ESLint
+```
+
+**Backend tests:** `pytest` — no conftest, files in `backend/tests/`. Mock hardware dependencies.
+**Frontend tests:** Vitest + React Testing Library + jsdom. Setup in `frontend/src/test/setup.ts`.
+**Android tests:** JUnit + Espresso.
+
+## State Machine
+
+Defined in `backend/app/core/state.py`. States: `INIT → CONNECTING → STREAMING → TRACKING → DIRECTING → OUTPUTTING → STOPPING → ERROR`. Transitions are validated — invalid transitions raise exceptions.
+
+## Coding Conventions
+
+- **File organization:** many small files over few large ones
+- **Error handling:** at every level, never swallow silently
+- **Adapters pattern:** real services wrapped with mock fallbacks in `api/deps.py`
+- **Commit format:** `<type>: <description>` (feat, fix, refactor, docs, test, chore, perf, ci)
+- **Python:** PEP 8, type hints, `from __future__ import annotations`
+- **TypeScript:** strict mode, no `any`, functional components
+
+## OpenCode Config
+
+`opencode.json` at repo root — agents (build, planner, architect, code-reviewer, debugger, tdd-engineer, implementer, etc.) and ECC skill references. Do not delete or restructure without understanding the agent wiring.
+
+## Security
+
+- No hardcoded secrets
+- All user inputs validated at trust boundaries
+- Camera permissions handled gracefully
+- Network discovery validated
+- CORS configured (currently `allow_origins=["*"]` — tighten for production)
+
+## Performance Constraints
 
 - GPU capped at 2GB VRAM, CPU at 2 cores
 - Auto port discovery (8000-9999)
 - Phone streaming: WebRTC → H.264 → MJPEG fallback
-- Context management: Avoid last 20% of context window
+- Context management: avoid last 20% of context window
+
+## ECC Agents (proactive use)
+
+| Situation | Agent | Action |
+|-----------|-------|--------|
+| Complex feature | `planner` | Implementation plan |
+| Code written | `code-reviewer` | Quality review |
+| Bug fix | `tdd-guide` | Tests first |
+| Security code | `security-reviewer` | Vulnerability check |
+| Build fails | `build-error-resolver` | Fix errors |
+| Python code | `python-reviewer` | Python patterns |
+| Android code | `kotlin-reviewer` | Kotlin patterns |

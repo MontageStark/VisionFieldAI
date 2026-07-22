@@ -45,16 +45,20 @@ class CameraServiceAdapter:
     def start(self) -> dict:
         if self._running:
             return {"status": "already_running"}
+        self._running = True
+        self._started_at = time.time()
         if self._real is not None:
             try:
                 if hasattr(self._real, "source") and self._real.source:
-                    opened = self._real.source.open()
-                    if not opened:
-                        return {"status": "error", "detail": "Failed to open camera source"}
+                    import threading
+                    def _try_connect():
+                        try:
+                            self._real.source.open()
+                        except Exception as exc:
+                            logger.warning("Camera source connect failed (will retry): %s", exc)
+                    threading.Thread(target=_try_connect, daemon=True).start()
             except Exception as exc:
-                return {"status": "error", "detail": str(exc)}
-        self._running = True
-        self._started_at = time.time()
+                logger.warning("Camera start background connect error: %s", exc)
         return {"status": "started", "timestamp": self._started_at}
 
     def stop(self) -> dict:

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Home, AlertTriangle } from 'lucide-react';
-import { servoApi, outputApi } from '@/services/api';
+import { servoApi } from '@/services/api';
 import type { ServoStatus } from '@/types/api';
 
 export function Servo(): JSX.Element {
@@ -12,7 +12,6 @@ export function Servo(): JSX.Element {
       setPanAngle(data.pan);
       setTiltAngle(data.tilt);
     }).catch(() => {});
-    outputApi.getMode().catch(() => {});
   }, []);
 
   return (
@@ -42,13 +41,13 @@ export function Servo(): JSX.Element {
         <div className="rounded-xl border border-dark-border bg-dark-card p-4">
           <h3 className="mb-4 text-sm font-semibold text-white">Calibration</h3>
           <div className="space-y-3">
-            <button className="w-full rounded-lg bg-dark-surface px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-dark-border transition-colors">
+            <button className="w-full rounded-lg bg-dark-surface px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-dark-border transition-colors">
               Center
             </button>
-            <button className="w-full rounded-lg bg-dark-surface px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-dark-border transition-colors">
+            <button className="w-full rounded-lg bg-dark-surface px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-dark-border transition-colors">
               Left Limit
             </button>
-            <button className="w-full rounded-lg bg-dark-surface px-4 py-2.5 text-left text-sm text-slate-300 hover:bg-dark-border transition-colors">
+            <button className="w-full rounded-lg bg-dark-surface px-4 py-2.5 text-left text-sm text-slate-200 hover:bg-dark-border transition-colors">
               Right Limit
             </button>
             <button className="w-full rounded-lg bg-primary-500/10 px-4 py-2.5 text-left text-sm font-medium text-primary-400 hover:bg-primary-500/20 transition-colors">

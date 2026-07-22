@@ -30,7 +30,7 @@ export function VirtualCamera(): JSX.Element {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div className="rounded-xl border border-dark-border bg-dark-card p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-white">Zoom</span>
@@ -43,6 +43,7 @@ export function VirtualCamera(): JSX.Element {
             step="0.1"
             value={zoom}
             onChange={(e) => setZoom(parseFloat(e.target.value))}
+            aria-label="Zoom level"
             className="w-full accent-primary-500"
           />
         </div>
@@ -58,6 +59,7 @@ export function VirtualCamera(): JSX.Element {
             max="50"
             value={deadZone}
             onChange={(e) => setDeadZone(parseInt(e.target.value))}
+            aria-label="Dead zone size"
             className="w-full accent-primary-500"
           />
         </div>
@@ -73,6 +75,7 @@ export function VirtualCamera(): JSX.Element {
             max="100"
             value={motionSpeed}
             onChange={(e) => setMotionSpeed(parseInt(e.target.value))}
+            aria-label="Motion speed"
             className="w-full accent-primary-500"
           />
         </div>

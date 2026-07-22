@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Clapperboard } from 'lucide-react';
 
 const modes = [
   { id: 'broadcast', label: 'Broadcast', description: 'Standard broadcast camera behavior' },
@@ -17,18 +18,11 @@ export function Director(): JSX.Element {
 
       <div className="rounded-xl border border-dark-border bg-dark-card p-4">
         <h3 className="mb-4 text-sm font-semibold text-white">Current Decision</h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Reasoning</span>
-            <span className="text-sm text-slate-200">Ball near penalty area, zooming in</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Confidence</span>
-            <span className="text-sm font-bold text-accent-success">95%</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Zoom Level</span>
-            <span className="text-sm font-bold text-primary-400">2.0x</span>
+        <div className="flex items-center gap-3 rounded-lg bg-dark-surface p-4">
+          <Clapperboard size={20} className="text-primary-400" />
+          <div>
+            <p className="text-sm text-slate-300">Waiting for live director data...</p>
+            <p className="text-xs text-slate-400">Start the camera to see real-time AI decisions</p>
           </div>
         </div>
       </div>
@@ -44,11 +38,11 @@ export function Director(): JSX.Element {
               className={`w-full rounded-lg px-4 py-3 text-left transition-colors ${
                 activeMode === mode.id
                   ? 'bg-primary-500/10 border border-primary-500/30 text-primary-400'
-                  : 'bg-dark-surface border border-transparent text-slate-400 hover:bg-dark-border'
+                  : 'bg-dark-surface border border-transparent text-slate-300 hover:bg-dark-border'
               }`}
             >
               <span className="text-sm font-medium">{mode.label}</span>
-              <p className="text-xs text-slate-500 mt-0.5">{mode.description}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{mode.description}</p>
             </button>
           ))}
         </div>

@@ -1,39 +1,17 @@
 import { useState } from 'react';
-
-const mockLogs = [
-  { id: '1', level: 'info', component: 'System', message: 'Application started', timestamp: '14:23:01' },
-  { id: '2', level: 'info', component: 'Camera', message: 'Camera connected - 720p@15fps', timestamp: '14:23:02' },
-  { id: '3', level: 'info', component: 'Director', message: 'Director mode set to broadcast', timestamp: '14:23:03' },
-  { id: '4', level: 'warning', component: 'GPU', message: 'GPU usage above 80%', timestamp: '14:23:05' },
-  { id: '5', level: 'error', component: 'Streaming', message: 'RTSP connection timeout', timestamp: '14:23:06' },
-  { id: '6', level: 'info', component: 'Tracking', message: '11 players detected', timestamp: '14:23:07' },
-];
-
-function levelColor(level: string) {
-  switch (level) {
-    case 'error': return 'text-accent-error';
-    case 'warning': return 'text-accent-warning';
-    default: return 'text-slate-300';
-  }
-}
+import { ScrollText } from 'lucide-react';
 
 export function Logs(): JSX.Element {
   const [levelFilter, setLevelFilter] = useState('All');
   const [search, setSearch] = useState('');
 
-  const filteredLogs = mockLogs.filter((log) => {
-    if (levelFilter !== 'All' && log.level !== levelFilter.toLowerCase()) return false;
-    if (search && !log.message.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
   return (
     <div className="space-y-4 p-6">
       <h2 className="text-xl font-bold text-white">Logs</h2>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Level</span>
+          <span className="text-xs text-slate-300">Level</span>
           {['All', 'Error', 'Warning', 'Info'].map((level) => (
             <button
               key={level}
@@ -41,7 +19,7 @@ export function Logs(): JSX.Element {
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 levelFilter === level
                   ? 'bg-primary-500/20 text-primary-400'
-                  : 'text-slate-400 hover:bg-dark-card'
+                  : 'text-slate-300 hover:bg-dark-card'
               }`}
             >
               {level}
@@ -49,7 +27,7 @@ export function Logs(): JSX.Element {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Component</span>
+          <span className="text-xs text-slate-300">Component</span>
           <select className="rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 text-xs text-slate-200">
             <option>All Components</option>
           </select>
@@ -57,6 +35,7 @@ export function Logs(): JSX.Element {
         <input
           type="text"
           placeholder="Search logs..."
+          aria-label="Search logs"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -64,20 +43,10 @@ export function Logs(): JSX.Element {
       </div>
 
       <div data-testid="log-viewer" className="rounded-xl border border-dark-border bg-dark-surface overflow-hidden">
-        <div className="space-y-0">
-          {filteredLogs.map((log) => (
-            <div
-              key={log.id}
-              className="flex items-start gap-4 border-b border-dark-border/50 px-4 py-2.5 font-mono text-xs last:border-0"
-            >
-              <span className="text-slate-500 shrink-0">{log.timestamp}</span>
-              <span className={`shrink-0 uppercase font-bold ${levelColor(log.level)}`}>
-                {log.level}
-              </span>
-              <span className="text-primary-400 shrink-0">{log.component}</span>
-              <span className="text-slate-300">{log.message}</span>
-            </div>
-          ))}
+        <div className="flex flex-col items-center justify-center py-12">
+          <ScrollText size={32} className="text-slate-500" />
+          <p className="mt-3 text-sm text-slate-300">No log entries yet</p>
+          <p className="text-xs text-slate-400">Start the system to see real-time logs</p>
         </div>
       </div>
     </div>

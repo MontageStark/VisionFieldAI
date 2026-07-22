@@ -29,6 +29,13 @@ export default {
           error: '#EF4444',
           info: '#06B6D4',
         },
+        chart: {
+          grid: '#2A3344',
+          axis: '#64748B',
+          fps: '#10B981',
+          gpu: '#3B82F6',
+          cpu: '#F59E0B',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

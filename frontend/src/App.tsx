@@ -1,38 +1,50 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AppLayout from '@/components/layout/AppLayout';
-import Dashboard from '@/pages/Dashboard/Dashboard';
-import Camera from '@/pages/Camera/Camera';
-import Servo from '@/pages/Servo/Servo';
-import Director from '@/pages/Director/Director';
-import Streaming from '@/pages/Streaming/Streaming';
-import Replay from '@/pages/Replay/Replay';
-import Health from '@/pages/Health/Health';
-import Logs from '@/pages/Logs/Logs';
-import Plugins from '@/pages/Plugins/Plugins';
-import Calibration from '@/pages/Calibration/Calibration';
-import Settings from '@/pages/Settings/Settings';
-import VirtualCamera from '@/pages/VirtualCamera';
-import Hardware from '@/pages/Hardware';
+
+const Dashboard = lazy(() => import('@/pages/Dashboard/Dashboard'));
+const Camera = lazy(() => import('@/pages/Camera/Camera'));
+const Servo = lazy(() => import('@/pages/Servo/Servo'));
+const Director = lazy(() => import('@/pages/Director/Director'));
+const Streaming = lazy(() => import('@/pages/Streaming/Streaming'));
+const Replay = lazy(() => import('@/pages/Replay/Replay'));
+const Health = lazy(() => import('@/pages/Health/Health'));
+const Logs = lazy(() => import('@/pages/Logs/Logs'));
+const Plugins = lazy(() => import('@/pages/Plugins/Plugins'));
+const Calibration = lazy(() => import('@/pages/Calibration/Calibration'));
+const Settings = lazy(() => import('@/pages/Settings/Settings'));
+const VirtualCamera = lazy(() => import('@/pages/VirtualCamera'));
+const Hardware = lazy(() => import('@/pages/Hardware'));
+const Analytics = lazy(() => import('@/pages/Analytics/Analytics'));
+
+function PageLoader() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+    </div>
+  );
+}
 
 export default function App(): JSX.Element {
   return (
     <ErrorBoundary>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/camera" element={<Camera />} />
-          <Route path="/servo" element={<Servo />} />
-          <Route path="/director" element={<Director />} />
-          <Route path="/streaming" element={<Streaming />} />
-          <Route path="/replay" element={<Replay />} />
-          <Route path="/health" element={<Health />} />
-          <Route path="/logs" element={<Logs />} />
-          <Route path="/plugins" element={<Plugins />} />
-          <Route path="/calibration" element={<Calibration />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/virtual-camera" element={<VirtualCamera />} />
-          <Route path="/hardware" element={<Hardware />} />
+          <Route path="/" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+          <Route path="/camera" element={<Suspense fallback={<PageLoader />}><Camera /></Suspense>} />
+          <Route path="/servo" element={<Suspense fallback={<PageLoader />}><Servo /></Suspense>} />
+          <Route path="/director" element={<Suspense fallback={<PageLoader />}><Director /></Suspense>} />
+          <Route path="/streaming" element={<Suspense fallback={<PageLoader />}><Streaming /></Suspense>} />
+          <Route path="/replay" element={<Suspense fallback={<PageLoader />}><Replay /></Suspense>} />
+          <Route path="/analytics" element={<Suspense fallback={<PageLoader />}><Analytics /></Suspense>} />
+          <Route path="/health" element={<Suspense fallback={<PageLoader />}><Health /></Suspense>} />
+          <Route path="/logs" element={<Suspense fallback={<PageLoader />}><Logs /></Suspense>} />
+          <Route path="/plugins" element={<Suspense fallback={<PageLoader />}><Plugins /></Suspense>} />
+          <Route path="/calibration" element={<Suspense fallback={<PageLoader />}><Calibration /></Suspense>} />
+          <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+          <Route path="/virtual-camera" element={<Suspense fallback={<PageLoader />}><VirtualCamera /></Suspense>} />
+          <Route path="/hardware" element={<Suspense fallback={<PageLoader />}><Hardware /></Suspense>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

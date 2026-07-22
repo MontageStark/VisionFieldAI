@@ -8,11 +8,10 @@ describe('Replay', () => {
     expect(screen.getByTestId('replay-timeline')).toBeInTheDocument();
   });
 
-  it('shows event markers on timeline', () => {
+  it('shows empty state when no recording data', () => {
     renderWithRouter(<Replay />);
-    expect(screen.getByText('Goal')).toBeInTheDocument();
-    expect(screen.getByText('Corner')).toBeInTheDocument();
-    expect(screen.getByText('Throw')).toBeInTheDocument();
+    expect(screen.getByText('No recording data')).toBeInTheDocument();
+    expect(screen.getByText('Start a recording to see events here')).toBeInTheDocument();
   });
 
   it('renders playback controls', () => {

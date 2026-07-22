@@ -53,8 +53,11 @@ frontend/node_modules/
 frontend/.vite/
 
 # ECC / OpenCode
+.opencode/
 .opencode-state/
 .mcp.json
+opencode.json
+.claude/
 
 # Embedded repos (managed separately)
 ecc-affaan/
@@ -67,3 +70,18 @@ target/
 # Python
 *.pyd
 .python-version
+
+# Graphify
+graphify-out/
+.graphify_*.json
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+.ruvector.db
+.swarm/
+ruvector.db
+
+# Coverage
+frontend/coverage/

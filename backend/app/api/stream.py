@@ -63,13 +63,10 @@ def stream_proxy(phone_ip: str = "192.168.0.176", port: int = 8080) -> Streaming
         try:
             sock.settimeout(30)
 
-            # Send a proper HTTP request to the phone's StreamServer.
-            # This is CRITICAL: without sending an HTTP request, ADB forward
-            # wraps the response in chunked encoding. With a request, we get
-            # plain HTTP that can be streamed directly.
+            # Send HTTP request to phone
             sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n")
 
-            # Read until we find the end of HTTP response headers (\r\n\r\n)
+            # Read until end of HTTP response headers
             buf = b""
             while b"\r\n\r\n" not in buf:
                 chunk = sock.recv(4096)
@@ -80,12 +77,12 @@ def stream_proxy(phone_ip: str = "192.168.0.176", port: int = 8080) -> Streaming
             header_end = buf.find(b"\r\n\r\n") + 4
             logger.info("Proxy: phone HTTP headers (%d bytes)", header_end)
 
-            # Yield any body data that came with the headers
+            # Yield body data that came with headers
             body = buf[header_end:]
             if body:
                 yield body
 
-            # Stream remaining bytes directly from socket
+            # Stream remaining bytes
             while True:
                 chunk = sock.recv(65536)
                 if not chunk:

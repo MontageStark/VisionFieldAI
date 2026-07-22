@@ -1,4 +1,5 @@
 import { useLocation } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { useSystemStore } from '@/stores/systemStore';
 
 const routeTitles: Record<string, string> = {
@@ -7,10 +8,8 @@ const routeTitles: Record<string, string> = {
   '/director': 'AI Director',
   '/streaming': 'Streaming',
   '/servo': 'Hardware',
-  '/analytics': 'Analytics',
   '/replay': 'Replay',
-  '/recording': 'Recording',
-  '/matches': 'Matches',
+  '/analytics': 'Analytics',
   '/settings': 'Settings',
   '/logs': 'Logs',
 };
@@ -41,7 +40,11 @@ function wsColor(s: string): string {
   }
 }
 
-export function Header(): JSX.Element {
+interface HeaderProps {
+  onMenuToggle?: () => void;
+}
+
+export function Header({ onMenuToggle }: HeaderProps): JSX.Element {
   const location = useLocation();
   const systemState = useSystemStore((s) => s.systemState);
   const apiConnected = useSystemStore((s) => s.apiConnected);
@@ -50,8 +53,17 @@ export function Header(): JSX.Element {
   const isLive = systemState === 'STREAMING' || systemState === 'TRACKING';
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-dark-border bg-dark-surface px-6" data-testid="header">
-      <div className="flex items-center gap-4">
+    <header className="flex h-16 items-center justify-between border-b border-dark-border bg-dark-surface px-4 sm:px-6" data-testid="header">
+      <div className="flex items-center gap-3">
+        {onMenuToggle && (
+          <button
+            onClick={onMenuToggle}
+            className="rounded-lg p-2 text-slate-300 hover:bg-dark-card lg:hidden"
+            aria-label="Toggle navigation menu"
+          >
+            <Menu size={20} />
+          </button>
+        )}
         <h1 className="text-lg font-semibold text-white">{pageTitle(location.pathname)}</h1>
         {isLive && (
           <span data-testid="live-indicator" className="flex items-center gap-1.5 rounded-full bg-accent-error/10 px-2.5 py-0.5 text-xs font-medium text-accent-error">
@@ -72,14 +84,14 @@ export function Header(): JSX.Element {
             data-testid="api-status"
             className={`inline-block h-2.5 w-2.5 rounded-full ${apiConnected ? 'bg-accent-success' : 'bg-accent-error'}`}
           />
-          <span className="text-slate-400">API</span>
+          <span className="text-slate-300">API</span>
         </div>
         <div className="flex items-center gap-2">
           <span
             data-testid="ws-status"
             className={`inline-block h-2.5 w-2.5 rounded-full ${wsColor(wsStatus)}`}
           />
-          <span className="text-slate-400">WS</span>
+          <span className="text-slate-300">WS</span>
         </div>
       </div>
     </header>

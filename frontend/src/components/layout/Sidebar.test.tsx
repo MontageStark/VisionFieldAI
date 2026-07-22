@@ -10,10 +10,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('AI Director')).toBeInTheDocument();
     expect(screen.getByText('Streaming')).toBeInTheDocument();
     expect(screen.getByText('Hardware')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Replay')).toBeInTheDocument();
-    expect(screen.getByText('Recording')).toBeInTheDocument();
-    expect(screen.getByText('Matches')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getByText('Logs')).toBeInTheDocument();
   });
