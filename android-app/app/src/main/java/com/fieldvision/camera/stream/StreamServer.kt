@@ -95,6 +95,10 @@ class StreamServer(private val port: Int = 8080) {
     private fun handleClient(socket: Socket) {
         scope.launch {
             try {
+                // Enable TCP keep-alive for connection stability
+                socket.keepAlive = true
+                socket.setSoTimeout(30000) // 30s read timeout
+
                 val output = socket.getOutputStream()
 
                 val header = "HTTP/1.1 200 OK\r\n" +

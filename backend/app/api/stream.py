@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import socket
+import time
 from typing import Generator
 
 from fastapi import APIRouter
@@ -36,6 +37,7 @@ def _try_connect(host: str, port: int, timeout: float = 3) -> socket.socket | No
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         sock.connect((host, port))
         return sock
     except Exception:
@@ -44,56 +46,77 @@ def _try_connect(host: str, port: int, timeout: float = 3) -> socket.socket | No
 
 @router.get("/proxy")
 def stream_proxy(phone_ip: str = "192.168.0.176", port: int = 8080) -> StreamingResponse:
+    MAX_RECONNECT_ATTEMPTS = 5
+    RECONNECT_DELAY_BASE = 2  # seconds, doubles each attempt
+
     def frame_generator() -> Generator[bytes, None, None]:
-        sock = None
+        attempt = 0
 
-        logger.info("Proxy: trying direct %s:%d", phone_ip, port)
-        sock = _try_connect(phone_ip, port, timeout=3)
-        if sock:
-            logger.info("Proxy: connected to %s:%d directly", phone_ip, port)
-        else:
-            logger.info("Proxy: direct failed, trying localhost:%d (ADB forward)", port)
-            sock = _try_connect("127.0.0.1", port, timeout=3)
-            if sock:
-                logger.info("Proxy: connected via ADB forward")
-            else:
-                logger.error("Proxy: cannot reach phone at %s:%d or localhost:%d", phone_ip, port, port)
-                return
+        while attempt < MAX_RECONNECT_ATTEMPTS:
+            sock = None
+            try:
+                logger.info("Proxy: connecting to %s:%d (attempt %d/%d)",
+                            phone_ip, port, attempt + 1, MAX_RECONNECT_ATTEMPTS)
 
-        try:
-            sock.settimeout(30)
+                sock = _try_connect(phone_ip, port, timeout=5)
+                if not sock:
+                    sock = _try_connect("127.0.0.1", port, timeout=5)
+                if not sock:
+                    logger.warning("Proxy: connection failed, retrying in %ds",
+                                   RECONNECT_DELAY_BASE * (2 ** attempt))
+                    attempt += 1
+                    time.sleep(RECONNECT_DELAY_BASE * (2 ** min(attempt, 3)))
+                    continue
 
-            # Send HTTP request to phone
-            sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n")
+                logger.info("Proxy: connected to %s:%d", phone_ip, port)
+                sock.settimeout(30)
 
-            # Read until end of HTTP response headers
-            buf = b""
-            while b"\r\n\r\n" not in buf:
-                chunk = sock.recv(4096)
-                if not chunk:
-                    break
-                buf += chunk
+                # Send HTTP request to phone
+                sock.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n")
 
-            header_end = buf.find(b"\r\n\r\n") + 4
-            logger.info("Proxy: phone HTTP headers (%d bytes)", header_end)
+                # Read until end of HTTP response headers
+                buf = b""
+                while b"\r\n\r\n" not in buf:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    buf += chunk
 
-            # Yield body data that came with headers
-            body = buf[header_end:]
-            if body:
-                yield body
+                header_end = buf.find(b"\r\n\r\n") + 4
+                logger.info("Proxy: phone HTTP headers (%d bytes)", header_end)
 
-            # Stream remaining bytes
-            while True:
-                chunk = sock.recv(65536)
-                if not chunk:
-                    break
-                yield chunk
+                # Yield body data that came with headers
+                body = buf[header_end:]
+                if body:
+                    yield body
 
-        except Exception as e:
-            logger.error("Proxy error: %s", e)
-        finally:
-            sock.close()
-            logger.info("Proxy connection closed")
+                # Reset attempt counter on successful connection
+                attempt = 0
+
+                # Stream remaining bytes — if this breaks, we reconnect
+                while True:
+                    chunk = sock.recv(65536)
+                    if not chunk:
+                        logger.warning("Proxy: connection lost to %s:%d, reconnecting...", phone_ip, port)
+                        break
+                    yield chunk
+
+            except Exception as e:
+                logger.error("Proxy error: %s", e)
+            finally:
+                if sock:
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
+
+            # If we get here, connection was lost — reconnect
+            attempt += 1
+            delay = RECONNECT_DELAY_BASE * (2 ** min(attempt - 1, 3))
+            logger.info("Proxy: reconnecting in %ds (attempt %d/%d)", delay, attempt, MAX_RECONNECT_ATTEMPTS)
+            time.sleep(delay)
+
+        logger.error("Proxy: gave up after %d reconnect attempts", MAX_RECONNECT_ATTEMPTS)
 
     return StreamingResponse(
         frame_generator(),

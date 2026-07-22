@@ -37,6 +37,7 @@ import com.fieldvision.camera.discovery.DiscoveryService
 import com.fieldvision.camera.discovery.PhoneInfo
 import com.fieldvision.camera.network.NetworkMonitor
 import com.fieldvision.camera.stream.StreamServer
+import com.fieldvision.camera.stream.StreamingService
 import com.fieldvision.camera.ui.CameraViewModel
 import com.fieldvision.camera.ui.navigation.CameraNavHost
 import com.fieldvision.camera.ui.theme.FieldVisionTheme
@@ -399,15 +400,18 @@ class MainActivity : ComponentActivity() {
     private fun startStreamServer() {
         isStreaming = true
         frameCount = 0
+        lastFrameTime = System.currentTimeMillis()
         Log.i("MainActivity", "Starting StreamServer... (cameraDevice=${cameraDevice != null}, captureSession=${captureSession != null})")
         streamServer.start()
-        Log.i("MainActivity", "StreamServer started, isRunning=${streamServer.isRunning}")
+        StreamingService.start(this)
+        Log.i("MainActivity", "StreamServer + ForegroundService started, isRunning=${streamServer.isRunning}")
     }
 
     private fun stopStreamServer() {
         isStreaming = false
         Log.i("MainActivity", "Stopping StreamServer... (sent $frameCount frames)")
         streamServer.stop()
+        StreamingService.stop(this)
     }
 
     private fun getDeviceIp(): String {
