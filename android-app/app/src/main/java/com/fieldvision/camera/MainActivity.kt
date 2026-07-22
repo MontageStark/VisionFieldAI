@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
     private var isStreaming = false
     private var viewModel: CameraViewModel? = null
     private var frameCount = 0L
+    private var lastFrameTime = 0L
     private var cameraRetryCount = 0
     private val maxCameraRetries = 5
     private var errorFrameCount = 0
@@ -278,18 +279,19 @@ class MainActivity : ComponentActivity() {
         val streamWidth = 1280
         val streamHeight = 720
 
-        imageReader = ImageReader.newInstance(streamWidth, streamHeight, android.graphics.ImageFormat.JPEG, 4)
+        imageReader = ImageReader.newInstance(streamWidth, streamHeight, android.graphics.ImageFormat.YUV_420_888, 4)
         imageReader?.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
             try {
                 frameCount++
+                lastFrameTime = System.currentTimeMillis()
                 if (isStreaming) {
-                    val buffer = image.planes[0].buffer
-                    val bytes = ByteArray(buffer.remaining())
-                    buffer.get(bytes)
-                    streamServer.sendFrameJpeg(bytes)
-                    if (frameCount % 60 == 0L) {
-                        Log.i("MainActivity", "Frame #$frameCount sent to StreamServer")
+                    val jpegBytes = yuv420ToJpeg(image, 85)
+                    if (jpegBytes != null) {
+                        streamServer.sendFrameJpeg(jpegBytes)
+                        if (frameCount % 60 == 0L) {
+                            Log.i("MainActivity", "Frame #$frameCount sent to StreamServer")
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -371,6 +373,8 @@ class MainActivity : ComponentActivity() {
 
             session.setRepeatingRequest(previewBuilder.build(), captureCallback, cameraHandler)
             Log.i("MainActivity", "Preview capture started (repeating request)")
+            lastFrameTime = System.currentTimeMillis()
+            startFrameWatchdog()
 
             if (!isStreaming) {
                 startStreamServer()
@@ -433,6 +437,62 @@ class MainActivity : ComponentActivity() {
         return null
     }
 
+    private fun startFrameWatchdog() {
+        scope.launch {
+            while (isActive && cameraDevice != null) {
+                delay(3000)
+                val now = System.currentTimeMillis()
+                val gap = now - lastFrameTime
+                if (lastFrameTime > 0 && gap > 5000) {
+                    Log.e("MainActivity", "Frame watchdog: no frames for ${gap}ms, reopening camera")
+                    closeCamera()
+                    delay(1000)
+                    if (hasCameraPermission() && previewSurface != null) {
+                        initializeCamera()
+                    }
+                    break
+                }
+            }
+        }
+    }
+
     private fun hasCameraPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+    private fun yuv420ToJpeg(image: android.media.Image, quality: Int): ByteArray? {
+        try {
+            val width = image.width
+            val height = image.height
+            val yPlane = image.planes[0]
+            val uPlane = image.planes[1]
+            val vPlane = image.planes[2]
+            val yBuffer = yPlane.buffer
+            val uBuffer = uPlane.buffer
+            val vBuffer = vPlane.buffer
+            val yRowStride = yPlane.rowStride
+            val uvRowStride = uPlane.rowStride
+            val uvPixelStride = uPlane.pixelStride
+            val nv21 = ByteArray(width * height * 3 / 2)
+            var pos = 0
+            for (row in 0 until height) {
+                yBuffer.position(row * yRowStride)
+                yBuffer.get(nv21, pos, width)
+                pos += width
+            }
+            for (row in 0 until height / 2) {
+                for (col in 0 until width / 2) {
+                    val uvIndex = row * uvRowStride + col * uvPixelStride
+                    nv21[pos++] = vBuffer.get(uvIndex)
+                    nv21[pos++] = uBuffer.get(uvIndex)
+                }
+            }
+            val yuvImage = android.graphics.YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null)
+            val out = java.io.ByteArrayOutputStream()
+            yuvImage.compressToJpeg(android.graphics.Rect(0, 0, width, height), quality, out)
+            return out.toByteArray()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "YUV conversion error: ${e.message}")
+            return null
+        }
+    }
 }
