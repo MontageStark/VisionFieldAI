@@ -1,4 +1,2 @@
-__all__ = ["MotionPlanner", "MotionService"]
-from app.services.motion.motion_planner import MotionPlanner, SafetyLayer, ServoAxis, ServoState
-
-MotionService = MotionPlanner
+__all__ = ["SafetyLayer", "ServoAxis"]
+from app.services.motion.safety import SafetyLayer, ServoAxis
