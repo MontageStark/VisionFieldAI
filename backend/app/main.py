@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import system, camera, servo, director, stream, websocket, output
+from app.api import system, camera, servo, director, stream, websocket, output, ai
 from app.api.deps import get_state_machine
 from app.core.state import SystemState
 
@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(stream.router)
     app.include_router(websocket.router)
     app.include_router(output.router)
+    app.include_router(ai.router)
 
     _start_time = time.time()
 

@@ -54,4 +54,14 @@ export const outputApi = {
   setMode: (mode: string) => client.post('/output/mode', { mode }).then((r) => r.data).catch(handleError),
 };
 
+// ─── AI Pipeline ───────────────────────────────────────────────────────
+export const aiApi = {
+  status: () => client.get('/ai/status').then((r) => r.data).catch(handleError),
+  tracking: () => client.get('/ai/tracking').then((r) => r.data).catch(handleError),
+  detections: () => client.get('/ai/detections').then((r) => r.data).catch(handleError),
+  decision: () => client.get('/ai/decision').then((r) => r.data).catch(handleError),
+  start: () => client.post('/ai/start').then((r) => r.data).catch(handleError),
+  stop: () => client.post('/ai/stop').then((r) => r.data).catch(handleError),
+};
+
 export default client;

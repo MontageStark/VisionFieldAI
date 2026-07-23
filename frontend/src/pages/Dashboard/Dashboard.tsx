@@ -1,17 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Activity, Camera as CameraIcon, Cpu, Users, Zap } from 'lucide-react';
+import { Activity, Camera as CameraIcon, Users, Zap, Brain } from 'lucide-react';
 import { useApiPolling } from '@/hooks/useApiPolling';
-import { cameraApi, directorApi } from '@/services/api';
+import { cameraApi, aiApi } from '@/services/api';
 
 export function Dashboard(): JSX.Element {
-  const { data: cameraStatus } = useApiPolling(
-    () => cameraApi.status(),
-    3000,
-  );
-  const { data: directorStatus } = useApiPolling(
-    () => directorApi.status(),
-    5000,
-  );
+  const { data: cameraStatus } = useApiPolling(() => cameraApi.status(), 3000);
+  const { data: aiStatus } = useApiPolling(() => aiApi.status(), 2000);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const [streamError, setStreamError] = useState(false);
@@ -30,92 +24,113 @@ export function Dashboard(): JSX.Element {
   }, []);
 
   const isRunning = cameraStatus?.running ?? false;
+  const aiRunning = aiStatus?.running ?? false;
+  const tracking = aiStatus?.tracking ?? {};
+  const decision = aiStatus?.decision ?? {};
 
-  const defaultStats = useMemo(() => [
-    { label: 'FPS', value: '--', icon: <Activity size={18} />, color: 'text-accent-success' },
-    { label: 'Latency', value: '--', icon: <Zap size={18} />, color: 'text-primary-400' },
-    { label: 'Players Detected', value: '--', icon: <Users size={18} />, color: 'text-accent-info' },
-    { label: 'GPU Usage', value: '--', icon: <Cpu size={18} />, color: 'text-accent-warning' },
-  ], []);
+  const stats = useMemo(() => [
+    { label: 'FPS', value: tracking.fps ?? '--', icon: <Activity size={18} />, color: 'text-accent-success' },
+    { label: 'Players', value: tracking.player_count ?? '--', icon: <Users size={18} />, color: 'text-accent-info' },
+    { label: 'Detections', value: tracking.detection_count ?? '--', icon: <Brain size={18} />, color: 'text-primary-400' },
+    { label: 'Confidence', value: decision.confidence ? `${(decision.confidence * 100).toFixed(0)}%` : '--', icon: <Zap size={18} />, color: 'text-accent-warning' },
+  ], [tracking, decision]);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">Dashboard</h2>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-medium ${
-            isRunning
-              ? 'bg-accent-success/10 text-accent-success'
-              : 'bg-dark-border text-slate-300'
-          }`}
-        >
-          {isRunning ? 'LIVE' : 'OFFLINE'}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+            isRunning ? 'bg-accent-success/10 text-accent-success' : 'bg-dark-border text-slate-300'
+          }`}>
+            {isRunning ? 'Camera Active' : 'Camera Off'}
+          </span>
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+            aiRunning ? 'bg-primary-500/10 text-primary-400' : 'bg-dark-border text-slate-300'
+          }`}>
+            {aiRunning ? 'AI Pipeline Active' : 'AI Off'}
+          </span>
+        </div>
       </div>
 
-      <div className="flex flex-1 gap-4">
-        <div className="flex-1 rounded-xl border border-dark-border bg-dark-card overflow-hidden">
-          <div data-testid="live-camera-feed" className="relative h-full min-h-[300px] bg-dark-surface">
-            {isRunning && !streamError ? (
-              <img
-                ref={imgRef}
-                src="/api/camera/stream"
-                alt={streamError ? 'Camera stream unavailable' : 'Live camera feed'}
-                className="h-full w-full object-contain"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center">
+      {/* Live preview + AI overlay */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black border border-dark-border">
+            <img
+              ref={imgRef}
+              src="http://192.168.0.187:8080"
+              alt="Live camera feed"
+              className="h-full w-full object-contain"
+              onError={() => setStreamError(true)}
+              onLoad={() => setStreamError(false)}
+            />
+            {streamError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
                 <div className="text-center">
-                  <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-dark-border mx-auto">
-                    <CameraIcon size={24} className="text-primary-400" />
-                  </div>
-                  <p className="text-sm text-slate-300">Live Camera Feed</p>
-                  <p className="text-xs text-slate-400">
-                    {streamError ? 'Stream unavailable' : 'No signal'}
-                  </p>
+                  <CameraIcon size={48} className="mx-auto mb-3 text-slate-600" />
+                  <p className="text-sm text-slate-400">Camera feed unavailable</p>
+                  <p className="text-xs text-slate-500 mt-1">Start streaming from the phone app</p>
+                </div>
+              </div>
+            )}
+            {/* AI overlay */}
+            {aiRunning && decision.shot_type && (
+              <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
+                <div className="flex items-center gap-2">
+                  <Brain size={14} className="text-primary-400" />
+                  <span className="text-xs font-medium text-primary-300">{decision.shot_type}</span>
+                  <span className="text-xs text-slate-400">zoom {decision.zoom}x</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        <div className="w-80 space-y-4">
+        {/* Stats + Director */}
+        <div className="space-y-4">
           <div className="rounded-xl border border-dark-border bg-dark-card p-4">
-            <h3 className="mb-1 text-sm font-semibold text-white">AI Director</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-300">Mode</span>
-                <span className="text-xs font-medium text-white capitalize">
-                  {directorStatus?.mode ?? 'broadcast'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-dark-border bg-dark-card p-4">
-            <h3 className="mb-3 text-sm font-semibold text-white">System</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {defaultStats.map((s) => (
-                <div key={s.label} className="rounded-lg bg-dark-surface p-2">
-                  <div className="flex items-center gap-1.5">
+            <h3 className="mb-3 text-sm font-semibold text-white">Pipeline Stats</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {stats.map((s) => (
+                <div key={s.label} className="rounded-lg bg-dark-surface p-3">
+                  <div className="flex items-center gap-2">
                     <span className={s.color}>{s.icon}</span>
-                    <span className="text-[10px] text-slate-300">{s.label}</span>
+                    <span className="text-xs text-slate-400">{s.label}</span>
                   </div>
-                  <p className={`mt-1 text-lg font-bold ${s.color}`}>{s.value}</p>
+                  <p className="mt-1 text-lg font-bold text-white">{s.value}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      </div>
 
-      <div data-testid="floating-controls" className="flex items-center gap-2 self-end">
-        <button className="flex items-center gap-2 rounded-lg bg-accent-success/10 px-4 py-2 text-sm font-medium text-accent-success hover:bg-accent-success/20">
-          Start
-        </button>
-        <button className="flex items-center gap-2 rounded-lg bg-accent-error/10 px-4 py-2 text-sm font-medium text-accent-error hover:bg-accent-error/20">
-          Record
-        </button>
+          <div className="rounded-xl border border-dark-border bg-dark-card p-4">
+            <h3 className="mb-3 text-sm font-semibold text-white">Director Decision</h3>
+            {decision.reasoning ? (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-300">{decision.reasoning}</p>
+                <div className="flex gap-4 text-xs text-slate-400">
+                  <span>pan: {decision.target_pan}°</span>
+                  <span>tilt: {decision.target_tilt}°</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">No decisions yet</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-dark-border bg-dark-card p-4">
+            <h3 className="mb-3 text-sm font-semibold text-white">Quick Actions</h3>
+            <div className="space-y-2">
+              <a href="/streaming" className="block rounded-lg bg-primary-500/10 px-3 py-2 text-xs font-medium text-primary-400 hover:bg-primary-500/20 transition-colors">
+                Open Streaming Page
+              </a>
+              <a href="/director" className="block rounded-lg bg-dark-surface px-3 py-2 text-xs font-medium text-slate-300 hover:bg-dark-card transition-colors">
+                AI Director Settings
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
