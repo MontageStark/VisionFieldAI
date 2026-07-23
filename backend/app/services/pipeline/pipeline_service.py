@@ -319,10 +319,11 @@ class PipelineService:
     def _update_director(self, detections: List[Detection]):
         """Update director decision based on detections.
         
-        Calculates a crop region that centers on the action.
+        Calculates a 16:9 crop region that centers on the action.
         The crop region is normalized (0-1) and the frontend applies it via CSS.
         """
         alpha = 0.3  # smoothing factor
+        TARGET_RATIO = 16 / 9  # 16:9 aspect ratio
 
         if not detections:
             # No motion — show full frame
@@ -350,15 +351,39 @@ class PipelineService:
         min_y = max(0, min_y - pad_y)
         max_y = min(1, max_y + pad_y)
 
-        # Calculate crop center and size
+        # Calculate initial crop center and size
         center_x = (min_x + max_x) / 2
         center_y = (min_y + max_y) / 2
-        crop_w = max_x - min_x
-        crop_h = max_y - min_y
+        raw_w = max_x - min_x
+        raw_h = max_y - min_y
 
-        # Enforce minimum crop size (at least 30% of frame)
-        crop_w = max(0.3, min(1.0, crop_w))
-        crop_h = max(0.3, min(1.0, crop_h))
+        # Enforce 16:9 aspect ratio
+        # If too wide relative to 16:9 → expand height
+        # If too tall relative to 16:9 → expand width
+        current_ratio = raw_w / raw_h if raw_h > 0 else TARGET_RATIO
+
+        if current_ratio > TARGET_RATIO:
+            # Too wide — expand height to match 16:9
+            crop_w = raw_w
+            crop_h = raw_w / TARGET_RATIO
+        else:
+            # Too tall — expand width to match 16:9
+            crop_h = raw_h
+            crop_w = raw_h * TARGET_RATIO
+
+        # Clamp to frame bounds, keeping center
+        crop_w = min(crop_w, 1.0)
+        crop_h = min(crop_h, 1.0)
+
+        # Adjust center if crop extends beyond frame
+        half_w = crop_w / 2
+        half_h = crop_h / 2
+        center_x = max(half_w, min(1 - half_w, center_x))
+        center_y = max(half_h, min(1 - half_h, center_y))
+
+        # Enforce minimum crop size (at least 30% of frame on shorter axis)
+        crop_w = max(0.3, crop_w)
+        crop_h = max(0.3 * TARGET_RATIO, crop_h)  # maintain 16:9
 
         # Smooth transition
         self._decision.crop_x = self._decision.crop_x * (1 - alpha) + center_x * alpha
@@ -370,22 +395,37 @@ class PipelineService:
         self._decision.crop_x = max(0, min(1, self._decision.crop_x))
         self._decision.crop_y = max(0, min(1, self._decision.crop_y))
         self._decision.crop_w = max(0.3, min(1, self._decision.crop_w))
-        self._decision.crop_h = max(0.3, min(1, self._decision.crop_h))
+        self._decision.crop_h = max(0.3 * TARGET_RATIO, min(1, self._decision.crop_h))
 
-        # Determine zoom level from crop size
+        # Maintain 16:9 after smoothing
+        smoothed_ratio = self._decision.crop_w / self._decision.crop_h
+        if smoothed_ratio > TARGET_RATIO:
+            self._decision.crop_h = self._decision.crop_w / TARGET_RATIO
+        else:
+            self._decision.crop_w = self._decision.crop_h * TARGET_RATIO
+
+        # Clamp again after ratio adjustment
+        self._decision.crop_w = min(self._decision.crop_w, 1.0)
+        self._decision.crop_h = min(self._decision.crop_h, 1.0)
+        half_w = self._decision.crop_w / 2
+        half_h = self._decision.crop_h / 2
+        self._decision.crop_x = max(half_w, min(1 - half_w, self._decision.crop_x))
+        self._decision.crop_y = max(half_h, min(1 - half_h, self._decision.crop_y))
+
+        # Zoom level from crop size
         zoom = 1.0 / max(self._decision.crop_w, self._decision.crop_h)
         self._decision.zoom = round(zoom, 2)
 
         # Shot type based on zoom level
         if zoom < 1.3:
             self._decision.shot_type = "wide"
-            self._decision.reasoning = f"{len(detections)} motion regions — wide crop"
+            self._decision.reasoning = f"{len(detections)} motion regions — wide 16:9 crop"
         elif zoom < 1.8:
             self._decision.shot_type = "broadcast"
-            self._decision.reasoning = f"{len(detections)} motion regions — broadcast crop"
+            self._decision.reasoning = f"{len(detections)} motion regions — broadcast 16:9 crop"
         else:
             self._decision.shot_type = "close"
-            self._decision.reasoning = f"{len(detections)} motion regions — tight crop"
+            self._decision.reasoning = f"{len(detections)} motion regions — tight 16:9 crop"
 
         self._decision.confidence = min(1.0, max(d.confidence for d in detections))
         self._decision.timestamp = time.time()
