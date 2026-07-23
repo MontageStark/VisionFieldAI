@@ -46,6 +46,11 @@ class DirectorDecision:
     reasoning: str = ""
     confidence: float = 0.0
     timestamp: float = 0.0
+    # Crop region for browser preview (normalized 0-1)
+    crop_x: float = 0.0   # center x
+    crop_y: float = 0.0   # center y
+    crop_w: float = 1.0   # width (1.0 = full frame)
+    crop_h: float = 1.0   # height (1.0 = full frame)
 
 
 class FrameAnalyzer:
@@ -173,13 +178,17 @@ class PipelineService:
             "reasoning": d.reasoning,
             "confidence": round(d.confidence, 2),
             "timestamp": d.timestamp,
+            "crop_x": round(d.crop_x, 3),
+            "crop_y": round(d.crop_y, 3),
+            "crop_w": round(d.crop_w, 3),
+            "crop_h": round(d.crop_h, 3),
         }
 
     def _run(self):
         """Main pipeline loop."""
         while self._running:
             try:
-                self._capture_and_analyze()
+                self._capture_single_frame()
             except Exception as e:
                 logger.error("Pipeline error: %s", e)
                 time.sleep(2)
@@ -308,42 +317,75 @@ class PipelineService:
         self._last_frame_time = time.time()
 
     def _update_director(self, detections: List[Detection]):
-        """Update director decision based on detections."""
+        """Update director decision based on detections.
+        
+        Calculates a crop region that centers on the action.
+        The crop region is normalized (0-1) and the frontend applies it via CSS.
+        """
+        alpha = 0.3  # smoothing factor
+
         if not detections:
+            # No motion — show full frame
             self._decision.shot_type = "wide"
-            self._decision.reasoning = "No motion detected — wide shot"
+            self._decision.reasoning = "No motion — full frame"
             self._decision.confidence = 0.5
-            self._decision.target_pan = 90.0
-            self._decision.target_tilt = 45.0
+            self._decision.crop_x = 0.5
+            self._decision.crop_y = 0.5
+            self._decision.crop_w = 1.0
+            self._decision.crop_h = 1.0
+            self._decision.zoom = 1.0
             return
 
-        # Find the most significant detection (largest area)
-        best = max(detections, key=lambda d: d.w * d.h)
+        # Calculate bounding box that contains all detections
+        min_x = min(d.x - d.w / 2 for d in detections)
+        max_x = max(d.x + d.w / 2 for d in detections)
+        min_y = min(d.y - d.h / 2 for d in detections)
+        max_y = max(d.y + d.h / 2 for d in detections)
 
-        # Pan toward the action (0-1 → 0-180 degrees)
-        target_pan = best.x * 180.0
-        target_tilt = best.y * 90.0  # tilt range is smaller
+        # Add padding (20% on each side)
+        pad_x = (max_x - min_x) * 0.2
+        pad_y = (max_y - min_y) * 0.2
+        min_x = max(0, min_x - pad_x)
+        max_x = min(1, max_x + pad_x)
+        min_y = max(0, min_y - pad_y)
+        max_y = min(1, max_y + pad_y)
+
+        # Calculate crop center and size
+        center_x = (min_x + max_x) / 2
+        center_y = (min_y + max_y) / 2
+        crop_w = max_x - min_x
+        crop_h = max_y - min_y
+
+        # Enforce minimum crop size (at least 30% of frame)
+        crop_w = max(0.3, min(1.0, crop_w))
+        crop_h = max(0.3, min(1.0, crop_h))
 
         # Smooth transition
-        alpha = 0.3
-        self._decision.target_pan = self._decision.target_pan * (1 - alpha) + target_pan * alpha
-        self._decision.target_tilt = self._decision.target_tilt * (1 - alpha) + target_tilt * alpha
-        self._decision.target_pan = max(0, min(180, self._decision.target_pan))
-        self._decision.target_tilt = max(0, min(90, self._decision.target_tilt))
+        self._decision.crop_x = self._decision.crop_x * (1 - alpha) + center_x * alpha
+        self._decision.crop_y = self._decision.crop_y * (1 - alpha) + center_y * alpha
+        self._decision.crop_w = self._decision.crop_w * (1 - alpha) + crop_w * alpha
+        self._decision.crop_h = self._decision.crop_h * (1 - alpha) + crop_h * alpha
 
-        # Shot type based on detection density
-        if len(detections) > 5:
+        # Clamp values
+        self._decision.crop_x = max(0, min(1, self._decision.crop_x))
+        self._decision.crop_y = max(0, min(1, self._decision.crop_y))
+        self._decision.crop_w = max(0.3, min(1, self._decision.crop_w))
+        self._decision.crop_h = max(0.3, min(1, self._decision.crop_h))
+
+        # Determine zoom level from crop size
+        zoom = 1.0 / max(self._decision.crop_w, self._decision.crop_h)
+        self._decision.zoom = round(zoom, 2)
+
+        # Shot type based on zoom level
+        if zoom < 1.3:
             self._decision.shot_type = "wide"
-            self._decision.zoom = 1.0
-            self._decision.reasoning = f"{len(detections)} motion regions — wide shot"
-        elif len(detections) > 2:
+            self._decision.reasoning = f"{len(detections)} motion regions — wide crop"
+        elif zoom < 1.8:
             self._decision.shot_type = "broadcast"
-            self._decision.zoom = 1.5
-            self._decision.reasoning = f"{len(detections)} motion regions — broadcast shot"
+            self._decision.reasoning = f"{len(detections)} motion regions — broadcast crop"
         else:
             self._decision.shot_type = "close"
-            self._decision.zoom = 2.0
-            self._decision.reasoning = f"Focused on motion — close shot"
+            self._decision.reasoning = f"{len(detections)} motion regions — tight crop"
 
-        self._decision.confidence = min(1.0, best.confidence)
+        self._decision.confidence = min(1.0, max(d.confidence for d in detections))
         self._decision.timestamp = time.time()

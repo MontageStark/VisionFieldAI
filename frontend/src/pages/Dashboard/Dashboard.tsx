@@ -61,7 +61,11 @@ export function Dashboard(): JSX.Element {
               ref={imgRef}
               src="http://192.168.0.187:8080"
               alt="Live camera feed"
-              className="h-full w-full object-contain"
+              className="h-full w-full transition-all duration-300"
+              style={{
+                objectFit: 'cover',
+                objectPosition: `${(decision.crop_x ?? 0.5) * 100}% ${(decision.crop_y ?? 0.5) * 100}%`,
+              }}
               onError={() => setStreamError(true)}
               onLoad={() => setStreamError(false)}
             />
@@ -76,13 +80,28 @@ export function Dashboard(): JSX.Element {
             )}
             {/* AI overlay */}
             {aiRunning && decision.shot_type && (
-              <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
-                <div className="flex items-center gap-2">
-                  <Brain size={14} className="text-primary-400" />
-                  <span className="text-xs font-medium text-primary-300">{decision.shot_type}</span>
-                  <span className="text-xs text-slate-400">zoom {decision.zoom}x</span>
+              <>
+                {/* Crop region indicator */}
+                {decision.crop_w < 1 && (
+                  <div
+                    className="absolute border-2 border-primary-400/50 rounded-lg pointer-events-none transition-all duration-300"
+                    style={{
+                      left: `${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}%`,
+                      top: `${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%`,
+                      width: `${(decision.crop_w ?? 1) * 100}%`,
+                      height: `${(decision.crop_h ?? 1) * 100}%`,
+                    }}
+                  />
+                )}
+                {/* Shot type badge */}
+                <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <Brain size={14} className="text-primary-400" />
+                    <span className="text-xs font-medium text-primary-300">{decision.shot_type}</span>
+                    <span className="text-xs text-slate-400">zoom {decision.zoom}x</span>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
