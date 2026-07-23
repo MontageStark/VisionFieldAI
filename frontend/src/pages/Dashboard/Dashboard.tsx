@@ -57,11 +57,16 @@ export function Dashboard(): JSX.Element {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black border border-dark-border">
+            {/* AI cropped view — the virtual broadcast camera */}
             <img
               ref={imgRef}
               src="http://192.168.0.187:8080"
               alt="Live camera feed"
-              className="h-full w-full object-contain"
+              className="h-full w-full transition-transform duration-200 ease-out"
+              style={{
+                transform: `scale(${1 / (decision.crop_w ?? 1)})`,
+                transformOrigin: `${(decision.crop_x ?? 0.5) * 100}% ${(decision.crop_y ?? 0.5) * 100}%`,
+              }}
               onError={() => setStreamError(true)}
               onLoad={() => setStreamError(false)}
             />
@@ -74,42 +79,15 @@ export function Dashboard(): JSX.Element {
                 </div>
               </div>
             )}
-            {/* Virtual broadcast camera overlay — rectangle showing where AI would crop */}
-            {aiRunning && (
-              <>
-                {/* Dimmed area outside crop */}
-                <div
-                  className="absolute inset-0 bg-black/40 transition-all duration-300 pointer-events-none"
-                  style={{
-                    clipPath: `polygon(
-                      0% 0%, 100% 0%, 100% 100%, 0% 100%,
-                      0% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%,
-                      ${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%,
-                      ${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) + (decision.crop_h ?? 1) / 2) * 100}%,
-                      ${((decision.crop_x ?? 0.5) + (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) + (decision.crop_h ?? 1) / 2) * 100}%,
-                      ${((decision.crop_x ?? 0.5) + (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%
-                    )`,
-                  }}
-                />
-                {/* Bright crop rectangle border */}
-                <div
-                  className="absolute border-[3px] border-green-400 rounded-sm pointer-events-none transition-all duration-300 ease-out shadow-[0_0_12px_rgba(74,222,128,0.3)]"
-                  style={{
-                    left: `${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}%`,
-                    top: `${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%`,
-                    width: `${(decision.crop_w ?? 1) * 100}%`,
-                    height: `${(decision.crop_h ?? 1) * 100}%`,
-                  }}
-                />
-                {/* Shot type badge */}
-                <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
-                  <div className="flex items-center gap-2">
-                    <Brain size={14} className="text-green-400" />
-                    <span className="text-xs font-medium text-green-300">{decision.shot_type}</span>
-                    <span className="text-xs text-slate-400">{decision.zoom}x</span>
-                  </div>
+            {/* Shot type badge */}
+            {aiRunning && decision.shot_type && (
+              <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
+                <div className="flex items-center gap-2">
+                  <Brain size={14} className="text-green-400" />
+                  <span className="text-xs font-medium text-green-300">{decision.shot_type}</span>
+                  <span className="text-xs text-slate-400">{decision.zoom}x</span>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
