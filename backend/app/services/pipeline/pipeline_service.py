@@ -54,9 +54,15 @@ class DirectorDecision:
 
 
 class FrameAnalyzer:
-    """Lightweight frame analysis — motion detection + color blobs.
+    """Football-aware frame analysis.
     
-    Replace with YOLO11 when GPU is available:
+    Detects players, ball, and action zones on a football field using:
+    1. Green field detection (HSV color space) — identifies the playing surface
+    2. Motion detection (frame differencing) — finds moving objects
+    3. Size filtering — players are medium, ball is small
+    4. Field mask — only detect motion ON the green field
+    
+    Replace with YOLO11 when GPU available:
         from ultralytics import YOLO
         model = YOLO("yolo11.pt")
     """
@@ -66,49 +72,70 @@ class FrameAnalyzer:
         self._frame_count = 0
 
     def analyze(self, jpeg_bytes: bytes) -> List[Detection]:
-        """Analyze a JPEG frame and return detections."""
+        """Analyze a JPEG frame for football action."""
         try:
             import cv2
-            # Decode JPEG to numpy array
             arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
             frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if frame is None:
                 return []
 
             h, w = frame.shape[:2]
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+            # Step 1: Detect green field (playing surface)
+            field_mask = self._detect_field(hsv, w, h)
+
+            # Step 2: Detect motion
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (15, 15), 0)
+            gray = cv2.GaussianBlur(gray, (11, 11), 0)
 
             detections = []
-
             if self._prev_gray is not None:
-                # Motion detection via frame differencing
                 diff = cv2.absdiff(self._prev_gray, gray)
-                # Lower threshold for better sensitivity
-                thresh = cv2.threshold(diff, 15, 255, cv2.THRESH_BINARY)[1]
+                thresh = cv2.threshold(diff, 12, 255, cv2.THRESH_BINARY)[1]
                 thresh = cv2.dilate(thresh, None, iterations=3)
+
+                # Step 3: Mask motion to only the green field
+                if field_mask is not None:
+                    thresh = cv2.bitwise_and(thresh, field_mask)
 
                 contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 for contour in contours:
                     area = cv2.contourArea(contour)
-                    if area < 200:  # lower threshold
+                    if area < 100:
                         continue
+
                     x, y, cw, ch = cv2.boundingRect(contour)
+                    cx = (x + cw / 2) / w
+                    cy = (y + ch / 2) / h
+                    nw = cw / w
+                    nh = ch / h
+
+                    # Classify by size
+                    if nw < 0.03 and nh < 0.03:
+                        label = "ball"
+                        confidence = min(1.0, 0.5 + area / 500)
+                    elif nw < 0.15 and nh < 0.25:
+                        label = "player"
+                        confidence = min(1.0, 0.6 + area / 2000)
+                    else:
+                        label = "action"
+                        confidence = min(1.0, 0.4 + area / 5000)
+
                     detections.append(Detection(
-                        label="motion",
-                        confidence=min(1.0, area / 3000),
-                        x=(x + cw / 2) / w,
-                        y=(y + ch / 2) / h,
-                        w=cw / w,
-                        h=ch / h,
+                        label=label,
+                        confidence=confidence,
+                        x=cx, y=cy, w=nw, h=nh,
                     ))
 
             self._prev_gray = gray
             self._frame_count += 1
 
             if detections:
-                logger.debug("Detected %d motion regions", len(detections))
+                logger.debug("Detected %d football objects: %s",
+                    len(detections), [d.label for d in detections])
 
             return detections
 
@@ -117,6 +144,31 @@ class FrameAnalyzer:
         except Exception as e:
             logger.debug("Frame analysis error: %s", e)
             return []
+
+    def _detect_field(self, hsv, w, h):
+        """Detect the green playing field using HSV color space.
+        Returns a binary mask of the field area."""
+        try:
+            import cv2
+            # Green field in HSV: H=35-85, S=40-255, V=40-255
+            lower_green = np.array([35, 40, 40])
+            upper_green = np.array([85, 255, 255])
+            mask = cv2.inRange(hsv, lower_green, upper_green)
+
+            # Clean up the mask
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+            # Only keep if enough green is detected (>5% of frame)
+            green_ratio = cv2.countNonZero(mask) / (w * h)
+            if green_ratio < 0.05:
+                return None  # Not a football field
+
+            return mask
+
+        except Exception:
+            return None
 
 
 class PipelineService:
