@@ -1,75 +1,66 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface UseApiPollingOptions {
+  interval?: number;
   enabled?: boolean;
 }
 
 export function useApiPolling<T>(
   fetcher: () => Promise<T>,
-  intervalMs: number = 5000,
-  options: UseApiPollingOptions = {}
+  interval: number = 3000,
+  options?: UseApiPollingOptions,
 ) {
-  const { enabled = true } = options;
   const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const fetcherRef = useRef(fetcher);
+  const enabled = options?.enabled !== false;
 
   useEffect(() => {
     fetcherRef.current = fetcher;
   }, [fetcher]);
 
-  useEffect(() => {
-    if (!enabled) {
+  const refetch = useCallback(async () => {
+    try {
+      const result = await fetcherRef.current();
+      setData(result);
+      setError(null);
       setLoading(false);
-      return;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+      setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
 
     let cancelled = false;
 
-    const run = async () => {
+    const poll = async () => {
       try {
-        setLoading(true);
         const result = await fetcherRef.current();
         if (!cancelled) {
           setData(result);
           setError(null);
+          setLoading(false);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-        }
-      } finally {
-        if (!cancelled) {
+          setError(err instanceof Error ? err : new Error(String(err)));
           setLoading(false);
         }
       }
     };
 
-    run();
-
-    const id = setInterval(run, intervalMs);
+    poll();
+    const id = setInterval(poll, interval);
 
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [enabled, intervalMs]);
+  }, [interval, enabled]);
 
-  const refetch = useCallback(async () => {
-    try {
-      setLoading(true);
-      const result = await fetcherRef.current();
-      setData(result);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { data, loading, error, refetch };
+  return { data, error, loading, refetch };
 }
-
-export default useApiPolling;

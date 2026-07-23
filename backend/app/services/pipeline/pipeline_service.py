@@ -77,26 +77,27 @@ class FrameAnalyzer:
 
             h, w = frame.shape[:2]
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (21, 21), 0)
+            gray = cv2.GaussianBlur(gray, (15, 15), 0)
 
             detections = []
 
             if self._prev_gray is not None:
                 # Motion detection via frame differencing
                 diff = cv2.absdiff(self._prev_gray, gray)
-                thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)[1]
-                thresh = cv2.dilate(thresh, None, iterations=2)
+                # Lower threshold for better sensitivity
+                thresh = cv2.threshold(diff, 15, 255, cv2.THRESH_BINARY)[1]
+                thresh = cv2.dilate(thresh, None, iterations=3)
 
                 contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 for contour in contours:
                     area = cv2.contourArea(contour)
-                    if area < 500:  # skip small noise
+                    if area < 200:  # lower threshold
                         continue
                     x, y, cw, ch = cv2.boundingRect(contour)
                     detections.append(Detection(
                         label="motion",
-                        confidence=min(1.0, area / 5000),
+                        confidence=min(1.0, area / 3000),
                         x=(x + cw / 2) / w,
                         y=(y + ch / 2) / h,
                         w=cw / w,
@@ -105,10 +106,13 @@ class FrameAnalyzer:
 
             self._prev_gray = gray
             self._frame_count += 1
+
+            if detections:
+                logger.debug("Detected %d motion regions", len(detections))
+
             return detections
 
         except ImportError:
-            # cv2 not available — return empty
             return []
         except Exception as e:
             logger.debug("Frame analysis error: %s", e)
