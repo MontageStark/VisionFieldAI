@@ -450,28 +450,28 @@ class PipelineService:
         """Enforce 16:9 aspect ratio on the current crop, clamping to frame bounds."""
         TARGET_RATIO = 16 / 9
 
+        cx = self._decision.crop_x
+        cy = self._decision.crop_y
         w = self._decision.crop_w
         h = self._decision.crop_h
 
-        # Ensure 16:9
-        if w / h > TARGET_RATIO:
-            h = w / TARGET_RATIO
-        else:
-            w = h * TARGET_RATIO
-
-        # Clamp to [0.3, 1.0]
+        # Clamp to frame bounds first
         w = max(0.3, min(1.0, w))
         h = max(0.3 / TARGET_RATIO, min(1.0, h))
 
-        # Re-enforce after clamping
+        # Enforce 16:9 — adjust the SMALLER dimension
         if w / h > TARGET_RATIO:
-            h = w / TARGET_RATIO
-        else:
+            # Too wide → shrink width
             w = h * TARGET_RATIO
+        else:
+            # Too tall → shrink height
+            h = w / TARGET_RATIO
 
-        # Clamp center to keep crop within frame
-        cx = self._decision.crop_x
-        cy = self._decision.crop_y
+        # Final clamp (in case rounding pushed us over)
+        w = min(w, 1.0)
+        h = min(h, 1.0)
+
+        # Keep center within frame
         half_w = w / 2
         half_h = h / 2
         cx = max(half_w, min(1 - half_w, cx))
