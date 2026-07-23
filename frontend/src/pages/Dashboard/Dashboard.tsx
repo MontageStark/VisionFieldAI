@@ -61,10 +61,10 @@ export function Dashboard(): JSX.Element {
               ref={imgRef}
               src="http://192.168.0.187:8080"
               alt="Live camera feed"
-              className="h-full w-full transition-all duration-300"
+              className="h-full w-full transition-transform duration-300 ease-out"
               style={{
-                objectFit: 'cover',
-                objectPosition: `${(decision.crop_x ?? 0.5) * 100}% ${(decision.crop_y ?? 0.5) * 100}%`,
+                transform: `scale(${1 / (decision.crop_w ?? 1)})`,
+                transformOrigin: `${(decision.crop_x ?? 0.5) * 100}% ${(decision.crop_y ?? 0.5) * 100}%`,
               }}
               onError={() => setStreamError(true)}
               onLoad={() => setStreamError(false)}
