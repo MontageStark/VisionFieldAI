@@ -321,115 +321,163 @@ class PipelineService:
         self._last_frame_time = time.time()
 
     def _update_director(self, detections: List[Detection]):
-        """Update director decision based on detections.
+        """FIFA-style broadcast director.
         
-        Calculates a 16:9 crop region that centers on the action.
-        The crop region is normalized (0-1) and the frontend applies it via CSS.
+        Finds the densest cluster of motion, creates a 16:9 crop that
+        follows the action like a professional TV camera operator.
+        The crop glides smoothly (gimbal-like) and changes size based
+        on how concentrated the action is.
         """
-        alpha = 0.3  # smoothing factor
-        TARGET_RATIO = 16 / 9  # 16:9 aspect ratio
+        TARGET_RATIO = 16 / 9
+        alpha = 0.12  # slow glide — smooth like a real camera operator
 
         if not detections:
-            # No motion — show full frame
+            # No motion — slowly pull back to full frame
             self._decision.shot_type = "wide"
             self._decision.reasoning = "No motion — full frame"
-            self._decision.confidence = 0.5
-            self._decision.crop_x = 0.5
-            self._decision.crop_y = 0.5
-            self._decision.crop_w = 1.0
-            self._decision.crop_h = 1.0
-            self._decision.zoom = 1.0
-            return
+            self._decision.confidence = 0.3
+            alpha = 0.05  # very slow pullback
+            target_x, target_y = 0.5, 0.5
+            target_w, target_h = 1.0, 1.0
+        else:
+            # Find the densest cluster of motion
+            target_x, target_y, target_w, target_h = self._find_best_cluster(detections)
+            self._decision.confidence = min(1.0, max(d.confidence for d in detections))
 
-        # Calculate bounding box that contains all detections
-        min_x = min(d.x - d.w / 2 for d in detections)
-        max_x = max(d.x + d.w / 2 for d in detections)
-        min_y = min(d.y - d.h / 2 for d in detections)
-        max_y = max(d.y + d.h / 2 for d in detections)
+        # Smooth transition (gimbal glide)
+        self._decision.crop_x += (target_x - self._decision.crop_x) * alpha
+        self._decision.crop_y += (target_y - self._decision.crop_y) * alpha
+        self._decision.crop_w += (target_w - self._decision.crop_w) * alpha
+        self._decision.crop_h += (target_h - self._decision.crop_h) * alpha
 
-        # Add padding (20% on each side)
-        pad_x = (max_x - min_x) * 0.2
-        pad_y = (max_y - min_y) * 0.2
-        min_x = max(0, min_x - pad_x)
-        max_x = min(1, max_x + pad_x)
-        min_y = max(0, min_y - pad_y)
-        max_y = min(1, max_y + pad_y)
+        # Enforce 16:9 ratio after smoothing
+        self._enforce_16_9()
 
-        # Calculate initial crop center and size
+        # Zoom = inverse of crop size
+        self._decision.zoom = round(1.0 / max(self._decision.crop_w, self._decision.crop_h), 2)
+
+        # Shot type
+        if self._decision.zoom < 1.3:
+            self._decision.shot_type = "wide"
+        elif self._decision.zoom < 2.0:
+            self._decision.shot_type = "broadcast"
+        else:
+            self._decision.shot_type = "close"
+
+        n = len(detections)
+        self._decision.reasoning = f"{n} motion regions — {self._decision.shot_type} 16:9"
+        self._decision.timestamp = time.time()
+
+    def _find_best_cluster(self, detections: List[Detection]) -> tuple:
+        """Find the densest cluster of motion and return a 16:9 crop for it.
+        
+        Strategy: for each detection, count how many other detections are
+        within a radius. The detection with the most neighbors is the
+        cluster center. The crop tightens around dense clusters.
+        """
+        TARGET_RATIO = 16 / 9
+
+        if len(detections) <= 1:
+            d = detections[0]
+            # Single detection — tight crop around it
+            crop_w = 0.45
+            crop_h = crop_w / TARGET_RATIO
+            return d.x, d.y, crop_w, crop_h
+
+        # Find cluster density for each detection
+        best_center = None
+        best_count = 0
+
+        for i, d in enumerate(detections):
+            count = 0
+            cx, cy = d.x, d.y
+            for j, other in enumerate(detections):
+                if i == j:
+                    continue
+                dist = ((other.x - cx) ** 2 + (other.y - cy) ** 2) ** 0.5
+                if dist < 0.25:  # within 25% of frame
+                    count += 1
+            if count > best_count:
+                best_count = count
+                best_center = d
+
+        if best_center is None:
+            best_center = detections[0]
+
+        # Calculate bounding box around the cluster
+        cluster_dets = [best_center]
+        for d in detections:
+            dist = ((d.x - best_center.x) ** 2 + (d.y - best_center.y) ** 2) ** 0.5
+            if dist < 0.25:
+                cluster_dets.append(d)
+
+        min_x = min(d.x - d.w / 2 for d in cluster_dets)
+        max_x = max(d.x + d.w / 2 for d in cluster_dets)
+        min_y = min(d.y - d.h / 2 for d in cluster_dets)
+        max_y = max(d.y + d.h / 2 for d in cluster_dets)
+
+        # Dynamic padding — less when action is concentrated
+        concentration = len(cluster_dets) / max(1, len(detections))
+        padding = 0.15 + (1 - concentration) * 0.15  # 15-30% based on density
+
+        min_x = max(0, min_x - padding)
+        max_x = min(1, max_x + padding)
+        min_y = max(0, min_y - padding)
+        max_y = min(1, max_y + padding)
+
         center_x = (min_x + max_x) / 2
         center_y = (min_y + max_y) / 2
         raw_w = max_x - min_x
         raw_h = max_y - min_y
 
-        # Enforce 16:9 aspect ratio
-        # If too wide relative to 16:9 → expand height
-        # If too tall relative to 16:9 → expand width
+        # Enforce 16:9
         current_ratio = raw_w / raw_h if raw_h > 0 else TARGET_RATIO
-
         if current_ratio > TARGET_RATIO:
-            # Too wide — expand height to match 16:9
             crop_w = raw_w
             crop_h = raw_w / TARGET_RATIO
         else:
-            # Too tall — expand width to match 16:9
             crop_h = raw_h
             crop_w = raw_h * TARGET_RATIO
 
-        # Clamp to frame bounds, keeping center
-        crop_w = min(crop_w, 1.0)
-        crop_h = min(crop_h, 1.0)
+        # Minimum crop — tighter when action is concentrated
+        min_crop = 0.35 if concentration > 0.5 else 0.45
+        crop_w = max(min_crop, min(1.0, crop_w))
+        crop_h = max(min_crop / TARGET_RATIO, min(1.0, crop_h))
 
-        # Adjust center if crop extends beyond frame
-        half_w = crop_w / 2
-        half_h = crop_h / 2
-        center_x = max(half_w, min(1 - half_w, center_x))
-        center_y = max(half_h, min(1 - half_h, center_y))
+        return center_x, center_y, crop_w, crop_h
 
-        # Enforce minimum crop size (at least 30% of frame on shorter axis)
-        crop_w = max(0.3, crop_w)
-        crop_h = max(0.3 * TARGET_RATIO, crop_h)  # maintain 16:9
+    def _enforce_16_9(self):
+        """Enforce 16:9 aspect ratio on the current crop, clamping to frame bounds."""
+        TARGET_RATIO = 16 / 9
 
-        # Smooth transition
-        self._decision.crop_x = self._decision.crop_x * (1 - alpha) + center_x * alpha
-        self._decision.crop_y = self._decision.crop_y * (1 - alpha) + center_y * alpha
-        self._decision.crop_w = self._decision.crop_w * (1 - alpha) + crop_w * alpha
-        self._decision.crop_h = self._decision.crop_h * (1 - alpha) + crop_h * alpha
+        w = self._decision.crop_w
+        h = self._decision.crop_h
 
-        # Clamp values
-        self._decision.crop_x = max(0, min(1, self._decision.crop_x))
-        self._decision.crop_y = max(0, min(1, self._decision.crop_y))
-        self._decision.crop_w = max(0.3, min(1, self._decision.crop_w))
-        self._decision.crop_h = max(0.3 * TARGET_RATIO, min(1, self._decision.crop_h))
-
-        # Maintain 16:9 after smoothing
-        smoothed_ratio = self._decision.crop_w / self._decision.crop_h
-        if smoothed_ratio > TARGET_RATIO:
-            self._decision.crop_h = self._decision.crop_w / TARGET_RATIO
+        # Ensure 16:9
+        if w / h > TARGET_RATIO:
+            h = w / TARGET_RATIO
         else:
-            self._decision.crop_w = self._decision.crop_h * TARGET_RATIO
+            w = h * TARGET_RATIO
 
-        # Clamp again after ratio adjustment
-        self._decision.crop_w = min(self._decision.crop_w, 1.0)
-        self._decision.crop_h = min(self._decision.crop_h, 1.0)
-        half_w = self._decision.crop_w / 2
-        half_h = self._decision.crop_h / 2
-        self._decision.crop_x = max(half_w, min(1 - half_w, self._decision.crop_x))
-        self._decision.crop_y = max(half_h, min(1 - half_h, self._decision.crop_y))
+        # Clamp to [0.3, 1.0]
+        w = max(0.3, min(1.0, w))
+        h = max(0.3 / TARGET_RATIO, min(1.0, h))
 
-        # Zoom level from crop size
-        zoom = 1.0 / max(self._decision.crop_w, self._decision.crop_h)
-        self._decision.zoom = round(zoom, 2)
-
-        # Shot type based on zoom level
-        if zoom < 1.3:
-            self._decision.shot_type = "wide"
-            self._decision.reasoning = f"{len(detections)} motion regions — wide 16:9 crop"
-        elif zoom < 1.8:
-            self._decision.shot_type = "broadcast"
-            self._decision.reasoning = f"{len(detections)} motion regions — broadcast 16:9 crop"
+        # Re-enforce after clamping
+        if w / h > TARGET_RATIO:
+            h = w / TARGET_RATIO
         else:
-            self._decision.shot_type = "close"
-            self._decision.reasoning = f"{len(detections)} motion regions — tight 16:9 crop"
+            w = h * TARGET_RATIO
 
-        self._decision.confidence = min(1.0, max(d.confidence for d in detections))
-        self._decision.timestamp = time.time()
+        # Clamp center to keep crop within frame
+        cx = self._decision.crop_x
+        cy = self._decision.crop_y
+        half_w = w / 2
+        half_h = h / 2
+        cx = max(half_w, min(1 - half_w, cx))
+        cy = max(half_h, min(1 - half_h, cy))
+
+        self._decision.crop_w = w
+        self._decision.crop_h = h
+        self._decision.crop_x = cx
+        self._decision.crop_y = cy

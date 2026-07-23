@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Radio, Play, Square, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Radio, Play, Square, RefreshCw, Wifi, WifiOff, Brain } from 'lucide-react';
+import { useApiPolling } from '@/hooks/useApiPolling';
+import { aiApi } from '@/services/api';
 
 const API_BASE = window.location.port === '5173'
   ? 'http://localhost:8001'
@@ -17,6 +19,9 @@ export function Streaming(): JSX.Element {
   const imgRef = useRef<HTMLImageElement>(null);
   const frameCountRef = useRef(0);
   const lastFpsTime = useRef(Date.now());
+
+  const { data: aiStatus } = useApiPolling(() => aiApi.status(), 2000);
+  const decision = aiStatus?.decision ?? {};
 
   const streamUrl = `${API_BASE}/api/stream/proxy?phone_ip=${phoneIp}&port=8080&_t=${streamKey}`;
 
@@ -130,13 +135,41 @@ export function Streaming(): JSX.Element {
         </div>
         <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
           {isLive && (
-            <img
-              ref={imgRef}
-              key={streamKey}
-              src={streamUrl}
-              alt="Live camera feed"
-              className="h-full w-full object-contain"
-            />
+            <>
+              <img
+                ref={imgRef}
+                key={streamKey}
+                src={streamUrl}
+                alt="Live camera feed"
+                className="h-full w-full transition-all duration-300"
+                style={{
+                  objectFit: 'cover',
+                  objectPosition: `${(decision.crop_x ?? 0.5) * 100}% ${(decision.crop_y ?? 0.5) * 100}%`,
+                }}
+              />
+              {/* Crop indicator */}
+              {(decision.crop_w ?? 1) < 1 && (
+                <div
+                  className="absolute border-2 border-primary-400/60 rounded-lg pointer-events-none transition-all duration-300"
+                  style={{
+                    left: `${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}%`,
+                    top: `${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%`,
+                    width: `${(decision.crop_w ?? 1) * 100}%`,
+                    height: `${(decision.crop_h ?? 1) * 100}%`,
+                  }}
+                />
+              )}
+              {/* Shot type badge */}
+              {decision.shot_type && (
+                <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <Brain size={14} className="text-primary-400" />
+                    <span className="text-xs font-medium text-primary-300">{decision.shot_type}</span>
+                    <span className="text-xs text-slate-400">{decision.zoom}x</span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           {!isLive && (
             <div className="flex h-full items-center justify-center text-slate-500">
