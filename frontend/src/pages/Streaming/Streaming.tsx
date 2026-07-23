@@ -141,23 +141,34 @@ export function Streaming(): JSX.Element {
                 key={streamKey}
                 src={streamUrl}
                 alt="Live camera feed"
-                className="h-full w-full transition-transform duration-300 ease-out"
-                style={{
-                  transform: `scale(${1 / (decision.crop_w ?? 1)})`,
-                  transformOrigin: `${(decision.crop_x ?? 0.5) * 100}% ${(decision.crop_y ?? 0.5) * 100}%`,
-                }}
+                className="h-full w-full object-contain"
               />
-              {/* Crop indicator */}
+              {/* Virtual broadcast camera overlay */}
               {(decision.crop_w ?? 1) < 1 && (
-                <div
-                  className="absolute border-2 border-primary-400/60 rounded-lg pointer-events-none transition-all duration-300"
-                  style={{
-                    left: `${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}%`,
-                    top: `${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%`,
-                    width: `${(decision.crop_w ?? 1) * 100}%`,
-                    height: `${(decision.crop_h ?? 1) * 100}%`,
-                  }}
-                />
+                <>
+                  <div
+                    className="absolute inset-0 bg-black/40 transition-all duration-300 pointer-events-none"
+                    style={{
+                      clipPath: `polygon(
+                        0% 0%, 100% 0%, 100% 100%, 0% 100%,
+                        0% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%,
+                        ${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%,
+                        ${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) + (decision.crop_h ?? 1) / 2) * 100}%,
+                        ${((decision.crop_x ?? 0.5) + (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) + (decision.crop_h ?? 1) / 2) * 100}%,
+                        ${((decision.crop_x ?? 0.5) + (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%
+                      )`,
+                    }}
+                  />
+                  <div
+                    className="absolute border-[3px] border-green-400 rounded-sm pointer-events-none transition-all duration-300 ease-out shadow-[0_0_12px_rgba(74,222,128,0.3)]"
+                    style={{
+                      left: `${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}%`,
+                      top: `${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%`,
+                      width: `${(decision.crop_w ?? 1) * 100}%`,
+                      height: `${(decision.crop_h ?? 1) * 100}%`,
+                    }}
+                  />
+                </>
               )}
               {/* Shot type badge */}
               {decision.shot_type && (
