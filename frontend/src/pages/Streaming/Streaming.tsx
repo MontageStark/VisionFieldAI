@@ -54,6 +54,15 @@ export function Streaming(): JSX.Element {
     const img = imgRef.current;
     if (!img) return;
 
+    // For MJPEG streams, onLoad never fires (stream never completes).
+    // Set a fallback timer: if no error in 3s, assume stream is working.
+    const fallbackTimer = setTimeout(() => {
+      if (state === 'connecting' || state === 'reconnecting') {
+        setState('live');
+        setErrorMsg('');
+      }
+    }, 3000);
+
     const onLoad = () => {
       setState('live');
       setErrorMsg('');
@@ -68,6 +77,7 @@ export function Streaming(): JSX.Element {
     };
 
     const onError = () => {
+      clearTimeout(fallbackTimer);
       if (state === 'live' || state === 'reconnecting') {
         setState('reconnecting');
         setErrorMsg('Connection lost. Reconnecting...');
@@ -82,6 +92,7 @@ export function Streaming(): JSX.Element {
     img.addEventListener('load', onLoad);
     img.addEventListener('error', onError);
     return () => {
+      clearTimeout(fallbackTimer);
       img.removeEventListener('load', onLoad);
       img.removeEventListener('error', onError);
     };
