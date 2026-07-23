@@ -1,7 +1,25 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { Activity, Camera as CameraIcon, Users, Zap, Brain, Maximize, Monitor } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { Activity, Camera as CameraIcon, Users, Zap, Brain, Maximize, Monitor, ChevronDown } from 'lucide-react';
 import { useApiPolling } from '@/hooks/useApiPolling';
 import { cameraApi, aiApi } from '@/services/api';
+
+type Quality = 'auto' | '4k' | '1080p' | '720p';
+
+const QUALITY_MAP: Record<Quality, { label: string; width: number; height: number }> = {
+  auto: { label: 'Auto', width: 0, height: 0 },
+  '4k': { label: '4K', width: 3840, height: 2160 },
+  '1080p': { label: '1080p', width: 1920, height: 1080 },
+  '720p': { label: '720p', width: 1280, height: 720 },
+};
+
+function getNetworkQuality(): Quality {
+  const conn = (navigator as any).connection;
+  if (!conn) return '720p';
+  const downlink = conn.downlink || 10; // Mbps
+  if (downlink >= 20) return '4k';
+  if (downlink >= 8) return '1080p';
+  return '720p';
+}
 
 export function Dashboard(): JSX.Element {
   const { data: cameraStatus } = useApiPolling(() => cameraApi.status(), 3000);
@@ -9,21 +27,29 @@ export function Dashboard(): JSX.Element {
 
   const imgRef = useRef<HTMLImageElement>(null);
   const [streamError, setStreamError] = useState(false);
+  const [quality, setQuality] = useState<Quality>('auto');
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
 
-  // Detect quality from phone stream
-  const streamQuality = useMemo(() => {
-    // Phone sends 1280x720 (720p) by default
-    // Could be extended to detect from camera status
-    return '720p';
-  }, []);
+  // Adaptive quality: in auto mode, detect network strength
+  const activeQuality = useMemo(() => {
+    if (quality !== 'auto') return quality;
+    return getNetworkQuality();
+  }, [quality]);
 
-  const enterFullscreen = () => {
+  const streamUrl = useMemo(() => {
+    const q = QUALITY_MAP[activeQuality];
+    const base = 'http://192.168.0.187:8080';
+    if (quality === 'auto') return base;
+    return `${base}?width=${q.width}&height=${q.height}`;
+  }, [activeQuality, quality]);
+
+  const enterFullscreen = useCallback(() => {
     const el = imgRef.current?.parentElement;
     if (el) {
       if (el.requestFullscreen) el.requestFullscreen();
       else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
     }
-  };
+  }, []);
 
   useEffect(() => {
     const img = imgRef.current;
@@ -72,10 +98,9 @@ export function Dashboard(): JSX.Element {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black border border-dark-border">
-            {/* AI cropped view — the virtual broadcast camera */}
             <img
               ref={imgRef}
-              src="http://192.168.0.187:8080"
+              src={streamUrl}
               alt="Live camera feed"
               className="h-full w-full transition-transform duration-200 ease-out"
               style={{
@@ -94,21 +119,6 @@ export function Dashboard(): JSX.Element {
                 </div>
               </div>
             )}
-            {/* Shot type badge + quality */}
-            {aiRunning && decision.shot_type && (
-              <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5 flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Brain size={14} className="text-green-400" />
-                  <span className="text-xs font-medium text-green-300">{decision.shot_type}</span>
-                  <span className="text-xs text-slate-400">{decision.zoom}x</span>
-                </div>
-                <div className="h-3 w-px bg-slate-600" />
-                <div className="flex items-center gap-1.5">
-                  <Monitor size={12} className="text-blue-400" />
-                  <span className="text-xs font-medium text-blue-300">{streamQuality}</span>
-                </div>
-              </div>
-            )}
             {/* Full screen button */}
             <button
               onClick={enterFullscreen}
@@ -117,6 +127,56 @@ export function Dashboard(): JSX.Element {
             >
               <Maximize size={16} />
             </button>
+          </div>
+
+          {/* Info bar OUTSIDE the video */}
+          <div className="mt-2 flex items-center justify-between rounded-lg bg-dark-card border border-dark-border px-4 py-2">
+            <div className="flex items-center gap-4">
+              {/* Shot type */}
+              {aiRunning && decision.shot_type && (
+                <div className="flex items-center gap-2">
+                  <Brain size={14} className="text-green-400" />
+                  <span className="text-xs font-medium text-green-300">{decision.shot_type}</span>
+                  <span className="text-xs text-slate-400">{decision.zoom}x</span>
+                </div>
+              )}
+              {/* Quality */}
+              <div className="flex items-center gap-2">
+                <Monitor size={14} className="text-blue-400" />
+                <span className="text-xs font-medium text-blue-300">{QUALITY_MAP[activeQuality].label}</span>
+              </div>
+            </div>
+
+            {/* Quality selector */}
+            <div className="relative">
+              <button
+                onClick={() => setShowQualityMenu(!showQualityMenu)}
+                className="flex items-center gap-1.5 rounded-lg bg-dark-surface px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-dark-card transition-colors"
+              >
+                Quality: {QUALITY_MAP[quality].label}
+                <ChevronDown size={12} />
+              </button>
+              {showQualityMenu && (
+                <div className="absolute right-0 top-full mt-1 z-10 w-32 rounded-lg bg-dark-card border border-dark-border shadow-lg">
+                  {(Object.keys(QUALITY_MAP) as Quality[]).map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => { setQuality(q); setShowQualityMenu(false); }}
+                      className={`w-full px-3 py-2 text-left text-xs transition-colors ${
+                        quality === q
+                          ? 'bg-primary-500/10 text-primary-400'
+                          : 'text-slate-300 hover:bg-dark-surface'
+                      }`}
+                    >
+                      {QUALITY_MAP[q].label}
+                      {q === 'auto' && (
+                        <span className="ml-1 text-slate-500">({getNetworkQuality()})</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
