@@ -143,33 +143,25 @@ export function Streaming(): JSX.Element {
                 alt="Live camera feed"
                 className="h-full w-full object-contain"
               />
-              {/* Virtual broadcast camera overlay */}
-              {(decision.crop_w ?? 1) < 1 && (
-                <>
-                  <div
-                    className="absolute inset-0 bg-black/40 transition-all duration-300 pointer-events-none"
-                    style={{
-                      clipPath: `polygon(
-                        0% 0%, 100% 0%, 100% 100%, 0% 100%,
-                        0% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%,
-                        ${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%,
-                        ${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) + (decision.crop_h ?? 1) / 2) * 100}%,
-                        ${((decision.crop_x ?? 0.5) + (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) + (decision.crop_h ?? 1) / 2) * 100}%,
-                        ${((decision.crop_x ?? 0.5) + (decision.crop_w ?? 1) / 2) * 100}% ${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%
-                      )`,
-                    }}
-                  />
-                  <div
-                    className="absolute border-[3px] border-green-400 rounded-sm pointer-events-none transition-all duration-300 ease-out shadow-[0_0_12px_rgba(74,222,128,0.3)]"
-                    style={{
-                      left: `${((decision.crop_x ?? 0.5) - (decision.crop_w ?? 1) / 2) * 100}%`,
-                      top: `${((decision.crop_y ?? 0.5) - (decision.crop_h ?? 1) / 2) * 100}%`,
-                      width: `${(decision.crop_w ?? 1) * 100}%`,
-                      height: `${(decision.crop_h ?? 1) * 100}%`,
-                    }}
-                  />
-                </>
-              )}
+              {/* Virtual broadcast camera overlay — always 16:9 */}
+              {(decision.crop_w ?? 1) < 1 && (() => {
+                const cx = (decision.crop_x ?? 0.5) * 100;
+                const cy = (decision.crop_y ?? 0.5) * 100;
+                const rw = (decision.crop_w ?? 1) * 100;
+                const rh = (decision.crop_h ?? 1) * 100;
+                return (
+                  <>
+                    <div
+                      className="absolute inset-0 bg-black/40 pointer-events-none transition-all duration-200"
+                      style={{ clipPath: `inset(${cy - rh/2}% ${100 - cx - rw/2}% ${100 - cy - rh/2}% ${cx - rw/2}%)` }}
+                    />
+                    <div
+                      className="absolute border-[3px] border-green-400 pointer-events-none transition-all duration-200 shadow-[0_0_12px_rgba(74,222,128,0.4)]"
+                      style={{ left: `${cx - rw/2}%`, top: `${cy - rh/2}%`, width: `${rw}%`, height: `${rh}%` }}
+                    />
+                  </>
+                );
+              })()}
               {/* Shot type badge */}
               {decision.shot_type && (
                 <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
