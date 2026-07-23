@@ -447,7 +447,7 @@ class PipelineService:
                 if i == j:
                     continue
                 dist = ((other.x - cx) ** 2 + (other.y - cy) ** 2) ** 0.5
-                if dist < 0.25:  # within 25% of frame
+                if dist < 0.12:  # tight radius — only nearby detections count
                     count += 1
             if count > best_count:
                 best_count = count
@@ -460,7 +460,7 @@ class PipelineService:
         cluster_dets = [best_center]
         for d in detections:
             dist = ((d.x - best_center.x) ** 2 + (d.y - best_center.y) ** 2) ** 0.5
-            if dist < 0.25:
+            if dist < 0.12:
                 cluster_dets.append(d)
 
         min_x = min(d.x - d.w / 2 for d in cluster_dets)
