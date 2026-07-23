@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Activity, Camera as CameraIcon, Users, Zap, Brain } from 'lucide-react';
+import { Activity, Camera as CameraIcon, Users, Zap, Brain, Maximize, Monitor } from 'lucide-react';
 import { useApiPolling } from '@/hooks/useApiPolling';
 import { cameraApi, aiApi } from '@/services/api';
 
@@ -9,6 +9,21 @@ export function Dashboard(): JSX.Element {
 
   const imgRef = useRef<HTMLImageElement>(null);
   const [streamError, setStreamError] = useState(false);
+
+  // Detect quality from phone stream
+  const streamQuality = useMemo(() => {
+    // Phone sends 1280x720 (720p) by default
+    // Could be extended to detect from camera status
+    return '720p';
+  }, []);
+
+  const enterFullscreen = () => {
+    const el = imgRef.current?.parentElement;
+    if (el) {
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
+    }
+  };
 
   useEffect(() => {
     const img = imgRef.current;
@@ -79,16 +94,29 @@ export function Dashboard(): JSX.Element {
                 </div>
               </div>
             )}
-            {/* Shot type badge */}
+            {/* Shot type badge + quality */}
             {aiRunning && decision.shot_type && (
-              <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5">
+              <div className="absolute top-3 left-3 rounded-lg bg-black/70 px-3 py-1.5 flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Brain size={14} className="text-green-400" />
                   <span className="text-xs font-medium text-green-300">{decision.shot_type}</span>
                   <span className="text-xs text-slate-400">{decision.zoom}x</span>
                 </div>
+                <div className="h-3 w-px bg-slate-600" />
+                <div className="flex items-center gap-1.5">
+                  <Monitor size={12} className="text-blue-400" />
+                  <span className="text-xs font-medium text-blue-300">{streamQuality}</span>
+                </div>
               </div>
             )}
+            {/* Full screen button */}
+            <button
+              onClick={enterFullscreen}
+              className="absolute top-3 right-3 rounded-lg bg-black/60 p-2 text-slate-400 hover:text-white hover:bg-black/80 transition-colors"
+              title="Full screen"
+            >
+              <Maximize size={16} />
+            </button>
           </div>
         </div>
 
